@@ -1,0 +1,6 @@
+epftoolbox @ git+https://github.com/jeslago/epftoolbox.git
+
+pandas~=2.3.0
+scikit-learn~=1.7.0
+numpy~=1.26.4
+tensorflow~=2.15.1
