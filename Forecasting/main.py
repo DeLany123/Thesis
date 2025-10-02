@@ -10,7 +10,7 @@ from sklearn.metrics import mean_squared_error
 
 
 def main():
-    df = pd.read_csv('2021_2024.csv', sep=';')
+    df = pd.read_csv('2021_2024_quarter_data.csv', sep=';')
     df['timestamp'] = pd.to_datetime(df['DateTime'], utc=True)
     df.set_index('timestamp', inplace=True)
     df.drop('DateTime', axis=1, inplace=True)
