@@ -27,3 +27,6 @@ De forecaster geeft één "beste" gok voor de toekomst. Het model uit het boek g
 ## 2/10
 ### Model
 Afwerken van eerste iteratie model alsook het neerschrijven ervan in een LaTeX document. Zie model.pdf .
+
+**Code implementatie**
+Eerste simulatie op heuristiek policy in Simulation/first.py
