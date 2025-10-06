@@ -33,3 +33,33 @@ Eerste simulatie op heuristiek policy in Simulation/first.py
 
 ## 6/10
 ### Simulatie
+Eerste simulatie op heuristiek policy "buy low, sell high" in Simulation/first.py [deze commit](https://github.com/DeLany123/Thesis/commit/d86b5aeaedef0a6e1726759b267f536b76d8d68f)
+Deze simulatie neemt als input de grote en charge rate van een batterij, alsook een range van mogelijke parameterwaarden 
+voor de heuristiek.
+
+De simulatie gebruikt de volgende input (nu met testdata ingevuld):
+- **Batterij Capaciteit:** 10.0 MWh
+- **Laad-/Ontlaadvermogen:** 2.0 MW
+- **Koopdrempels (testbereik):** Van 80 tot 100 EUR/MWh
+- **Verkoopdrempels (testbereik):** Van 105 tot 125 EUR/MWh
+
+Met als resultaat
+```bash
+--- Grid Search Complete ---
+Optimal Buy Threshold: 90.00 EUR/MWh
+Optimal Sell Threshold: 105.00 EUR/MWh
+Resulting Best Profit: 300812.77 EUR
+```
+
+Achter de simulatie kwam het besef dat ik nu enkel een "trader" die enkel met een Battery Energy Storage System (BES) kijkt
+naar de grootste winst. Er wordt nog **geen rekening gehouden met de demand van de gebruiker.**
+
+De demand van de gebruiker moet vervuld worden door ofwel de batterij te gebruiken, ofwel op de imbalance markt te kopen.
+Het kan zelfs zijn dat deze laatste voordeliger lijkt dan de batterij te gebruiken aangezien op een later tijdstip de
+elektriciteit kan verkocht worden aan een veel hogere prijs.
+
+Met deze nieuwe inzichten kon ik het model terug wat aanpassen.
+
+### Model
+Meer decision variables alsook meer constraints toegevoegd aan het model. Zie model.pdf .
+De rest moet nog gewijzigd worden aan het model. Zie nieuw document Thesis_Model_1.pdf .
