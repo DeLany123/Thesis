@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 
 
 def simulate_policy(prices, theta_buy, theta_sell, battery_capacity_mwh, charge_discharge_rate_mw):
@@ -11,67 +12,53 @@ def simulate_policy(prices, theta_buy, theta_sell, battery_capacity_mwh, charge_
     current_quarter_decision = 0
 
     # Amount of datapoints to look in the past
-    confirmation_period_minutes = 3
+    confirmation_period_minutes = 5
 
-    # Loop door elke minuut van de prijsdata. 'i' is de index van de minuut.
     for i, price in enumerate(prices):
 
-        # --- BESLISSINGSLOGICA: Alleen aan het begin van een kwartier ---
-        # De modulo operator (%) checkt of 'i' een veelvoud van 15 is.
+        # Only take a decision at the start of each quarter (every 15 minutes)
         if i % 15 == 0:
-            # We staan aan het begin van een nieuw kwartier. Reset de beslissing.
             current_quarter_decision = 0
 
-            # We kunnen alleen een beslissing nemen als we genoeg geschiedenis hebben.
             if i >= confirmation_period_minutes:
-                # Pak de prijzen van de laatste paar minuten van het VORIGE kwartier.
                 trend_check_prices = prices[i - confirmation_period_minutes: i]
 
-                # Check 1: Is dit een goed moment om te beginnen met LADEN?
-                # Voorwaarde: alle recente prijzen waren onder de koopdrempel.
+                # Check if charging can start
                 is_charge_signal = all(p <= theta_buy for p in trend_check_prices)
                 if is_charge_signal:
                     current_quarter_decision = 1
 
-                # Check 2: Is dit een goed moment om te beginnen met ONTLADEN?
-                # Voorwaarde: alle recente prijzen waren boven de verkoopdrempel.
                 is_discharge_signal = all(p >= theta_sell for p in trend_check_prices)
                 if is_discharge_signal:
                     current_quarter_decision = -1
 
-        # --- ACTIE LOGICA: Voer de beslissing voor dit kwartier uit ---
-        # Start met de beslissing die aan het begin van het kwartier is genomen.
+        # Logic after taking a decision
         decision_this_minute = current_quarter_decision
 
-        # Controleer de fysieke limieten van de batterij.
+        # Battery constraints
         if decision_this_minute == 1 and soc_mwh >= battery_capacity_mwh:
-            decision_this_minute = 0  # Stop met laden, batterij is vol.
+            decision_this_minute = 0 # Battery is full
         elif decision_this_minute == -1 and soc_mwh <= 0:
-            decision_this_minute = 0  # Stop met ontladen, batterij is leeg.
+            decision_this_minute = 0  # Battery is empty
 
-        # --- UPDATE VAN BATTERIJ EN WINST ---
-        if decision_this_minute == 1:  # Opladen
-            # Energieberekening voor 1 minuut (1/60 van een uur).
+        # Update battery
+        if decision_this_minute == 1:
             energy_to_charge = charge_discharge_rate_mw * (1 / 60)
             actual_charge = min(energy_to_charge, battery_capacity_mwh - soc_mwh)
             soc_mwh += actual_charge
-            # De kost wordt berekend met de prijs-schatting van DEZE minuut.
+
             cost = actual_charge * price
             total_profit -= cost
 
-        elif decision_this_minute == -1:  # Ontladen
-            # Energieberekening voor 1 minuut.
+        elif decision_this_minute == -1:
             energy_to_discharge = charge_discharge_rate_mw * (1 / 60)
             actual_discharge = min(energy_to_discharge, soc_mwh)
             soc_mwh -= actual_discharge
-            # De opbrengst wordt berekend met de prijs-schatting van DEZE minuut.
             revenue = actual_discharge * price
             total_profit += revenue
 
     return total_profit
 
-
-# --- 2. Implement the Grid Search ---
 
 def grid_search_tuning(prices, buy_thresholds, sell_thresholds, battery_capacity_mwh, charge_discharge_rate_mw):
     """
@@ -79,7 +66,7 @@ def grid_search_tuning(prices, buy_thresholds, sell_thresholds, battery_capacity
     """
     best_profit = -np.inf
     best_params = {'buy': None, 'sell': None}
-
+    print("Amount of loops to perform:", len(buy_thresholds))
     # Loop through every combination of parameters
     for theta_buy in buy_thresholds:
         for theta_sell in sell_thresholds:
@@ -105,10 +92,30 @@ def grid_search_tuning(prices, buy_thresholds, sell_thresholds, battery_capacity
 # --- 3. Run the Example ---
 
 if __name__ == '__main__':
-    # Create a dummy historical price path (replace with your actual data)
-    np.random.seed(42)
-    dummy_prices = 100 + np.random.randn(500).cumsum()
+    data = pd.read_csv('../data/2025_minute.csv', sep=';')
+    data = data.iloc[::-1].reset_index(drop=True)
 
+    # Check data start on quarter
+    try:
+        data['Datetime'] = pd.to_datetime(data['Datetime'], utc=True)
+        start_minute = data.loc[0, 'Datetime'].minute
+        if start_minute % 15 != 0:
+            raise ValueError(
+                f"Data does not start on a quarter hour (minute 0, 15, 30, 45). Started at minute: {start_minute}")
+        print("Data successfully verified to start on a quarter hour.")
+    except:
+        raise ValueError("Something went wrong with the datetime conversion.")
+
+    # Check for nan values
+    nan_rows = data[data['Imbalance Price'].isnull()]
+    if len(nan_rows) > 0:
+        # Removing all rows in a quarter where a nan value is found
+        faulty_quarters = nan_rows["Datetime"].dt.floor('15T').unique()
+        full_data_quarters = data['Datetime'].dt.floor('15T')
+        keep_mask = ~full_data_quarters.isin(faulty_quarters)
+        data = data[keep_mask]
+
+    prices = data['Imbalance Price'].to_numpy()
     # Define battery characteristics
     CAPACITY_MWH = 10.0
     RATE_MW = 2.0
@@ -119,7 +126,7 @@ if __name__ == '__main__':
 
     print("--- Starting Grid Search ---")
 
-    optimal_params, optimal_profit = grid_search_tuning(dummy_prices, buy_range, sell_range, CAPACITY_MWH, RATE_MW)
+    optimal_params, optimal_profit = grid_search_tuning(prices, buy_range, sell_range, CAPACITY_MWH, RATE_MW)
 
     print("\n--- Grid Search Complete ---")
     print(f"Optimal Buy Threshold: {optimal_params['buy']:.2f} EUR/MWh")

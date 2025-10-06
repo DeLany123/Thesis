@@ -30,3 +30,6 @@ Afwerken van eerste iteratie model alsook het neerschrijven ervan in een LaTeX d
 
 **Code implementatie**
 Eerste simulatie op heuristiek policy in Simulation/first.py
+
+## 6/10
+### Simulatie
