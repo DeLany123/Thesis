@@ -96,7 +96,7 @@ class BatteryTradingEnv(gym.Env):
         self.soc_mwh += actual_energy_traded
 
         terminated = self.current_step >= self.max_steps - 1
-        reward = -self.prices[self.current_step] * actual_energy_traded
+        reward = self._calculate_delayed_reward()
         start_index = max(0, self.current_step - self.number_of_past_prices)
 
         # Prepare the observation with price history, pad is added if history is shorter than required
@@ -118,6 +118,7 @@ class BatteryTradingEnv(gym.Env):
             'total_energy_traded_this_quarter': self.total_energy_traded_per_quarter,
         }
         self.current_step += 1
+        self.total_energy_traded_per_quarter += actual_energy_traded
         return obs, reward, terminated, False, info
 
 
