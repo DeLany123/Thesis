@@ -1,10 +1,12 @@
+import os
+
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import numpy as np
 
 
-def plot_simulation_results_minute_by_minute(results: pd.DataFrame, start_minute: int = 0, end_minute: int = None):
+def plot_simulation_results_minute_by_minute(results: pd.DataFrame, start_minute: int = 0, end_minute: int = 1440):
     """
     Plots minute-by-minute results with full date and time labels,
     derived from the 'datetimes' key in the results.
@@ -58,4 +60,15 @@ def plot_simulation_results_minute_by_minute(results: pd.DataFrame, start_minute
     plt.title(f'Minute-by-Minute Simulation Results')
     fig.autofmt_xdate(rotation=30, ha='right')
     plt.tight_layout()
+
+    # Define the directory and filename for the plot
+    plots_dir = 'plots'
+    filename = 'simulation_results.png'
+    full_path = os.path.join(plots_dir, filename)
+    os.makedirs(plots_dir, exist_ok=True)
+
+    # Save the figure
+    print(f"Saving plot to: {full_path}")
+    plt.savefig(full_path, dpi=300)
+
     plt.show()

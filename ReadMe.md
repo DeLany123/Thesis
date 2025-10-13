@@ -1,3 +1,61 @@
+# Run the Project
+
+1.  **Set up the Environment:**
+    First, create and activate a virtual environment.
+    ```bash
+    python3 -m venv .venv
+    source .venv/bin/activate
+    ```
+
+2.  **Install Dependencies:**
+    Install all the required packages using the `requirements.txt` file.
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+3.  **Run the Simulation:**
+    Navigate to the `Simulation` directory and execute the driver script as a module. You can choose a mode to run.
+    New plots are saved to the `plots` directory.
+
+    *   **Run a single simulation** with default parameters:
+        ```bash
+        python -m Simulation.suite_simple_trading.driver --mode run
+        ```
+
+    *   **Run a grid search** to find the best heuristic parameters:
+        Here you can change the range in the code in `driver.py`.
+        ```bash
+        python -m Simulation.suite_simple_trading.driver --mode gridsearch
+        ```
+#### Command-Line Arguments
+You can customize the simulation using the following arguments:
+
+*   `--mode`: (Required) Specifies the operating mode.
+    *   `run`: Executes a single simulation run.
+    *   `gridsearch`: Performs a full grid search to find optimal `buy` and `sell` thresholds.
+
+*   `--buy`: (Optional, for `run` mode) Sets the buying/charging price threshold. Defaults to `10.0`.
+    *   Example: `--buy 0`
+
+*   `--sell`: (Optional, for `run` mode) Sets the selling/discharging price threshold. Defaults to `120.0`.
+    *   Example: `--sell 150`
+
+*   `--start-date`: (Optional, for `run` mode) Sets the start timestamp for the plot window.
+    *   Format: `"YYYY-MM-DD HH:MM:SS"` Also possible without the time part, e.g. `"2025-01-15"`
+    *   Default: `"2025-01-01 00:00:00"`
+    *   Example: `--start-date "2025-01-15 08:00:00"`
+
+*   `--end-date`: (Optional, for `run` mode) Sets the end timestamp for the plot window.
+    *   Format: `"YYYY-MM-DD HH:MM:SS"` Also possible without the time part, e.g. `"2025-01-15"`
+    *   Default: 1 day after the start date
+    *   Example: `--end-date "2025-01-15 17:00:00"`
+
+**Example with Custom Parameters:**
+To run a single simulation and plot only the morning of January 15th:
+```bash
+python -m Simulation.suite_simple_trading.driver --mode run --buy 0 --sell 150 --start-date "2025-01-15 06:00:00" --end-date "2025-01-15 12:00:00"
+```
+
 # Overzicht vooruitgang
 
 ## 26/09

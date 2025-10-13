@@ -70,7 +70,7 @@ class BatteryTradingEnv(gym.Env):
 
     def step(self, action):
         # Reset total_energy_traded_per_quarter every quarter
-        if self.all_data.index[self.current_step].minute % 15 == 0:
+        if self.all_data['Datetime'][self.current_step].minute % 15 == 0:
             self.total_energy_traded_per_quarter = 0.0
 
         x_t = 0.0 # Energy traded
@@ -127,4 +127,4 @@ class BatteryTradingEnv(gym.Env):
 
     def _calculate_delayed_reward(self):
         # Reward based on price at the end of a quarter, this is also what businesses have to pay
-        return -self.prices[self.current_step] * self.total_energy_traded_per_quarter if self.all_data.index[self.current_step].minute % 15 == 14 else 0.0
+        return -self.prices[self.current_step] * self.total_energy_traded_per_quarter if self.all_data['Datetime'][self.current_step].minute % 15 == 14 else 0.0
