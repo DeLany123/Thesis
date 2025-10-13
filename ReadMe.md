@@ -63,3 +63,21 @@ Met deze nieuwe inzichten kon ik het model terug wat aanpassen.
 ### Model
 Meer decision variables alsook meer constraints toegevoegd aan het model. Zie model.pdf .
 De rest moet nog gewijzigd worden aan het model. Zie nieuw document Thesis_Model_1.pdf .
+
+## 10/10
+### Simulatie
+Infrastruur verder uitgewerkt zodat meerdere soorten policies en netwerken op hetzelfde model getest kunnen worden.  
+Hierbij ook de eerste simulatie afgewerkt en een plotting functie toegevoegd waarbij als parameter de startdatum en lengte
+meegegeven kan worden. Zie Simulation/suite_simple_trading/plotting.py [deze commit](https://github.com/DeLany123/Thesis/commit/2a5a2326e22d02cdcd2c4da1de3d3cae7d09cae4)
+![simulation_plot](plots/model1_easy_heuristic_simulation.png "Voorspelling vs. Werkelijkheid voor 2024")    
+In de plot zien we de beslissing van de batterij om op te laden en de prijs van de imbalanceprijs.
+
+### Eerste meeting Thesis
+Overleg over het basic model en alle mogelijke policy families. Alsook de reward functie is besproken.
+Besproken om te onderzoeken.
+<ol>
+<li>Betere reward functie, reward is pas aan het einde van het kwartier.</li>
+<li>Policyfamilies bekijken, uittesten, welke zien er veelbelovend uit, welke niet.</li>
+<li>Invloed van forecasting op het model</li>
+</ol>
+

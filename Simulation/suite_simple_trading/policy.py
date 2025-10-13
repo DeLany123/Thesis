@@ -3,6 +3,7 @@ import numpy as np
 import os
 import pandas as pd
 from stable_baselines3 import DQN
+from stable_baselines3.common.base_class import BaseAlgorithm
 
 
 class QuarterlyTrendDecisionMaker:

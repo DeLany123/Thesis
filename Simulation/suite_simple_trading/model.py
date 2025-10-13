@@ -1,5 +1,6 @@
 import gymnasium as gym
 import numpy as np
+import pandas as pd
 
 class BatteryTradingEnv(gym.Env):
     """
@@ -10,16 +11,18 @@ class BatteryTradingEnv(gym.Env):
             self,
             battery_capacity_mwh: float,
             charge_discharge_rate_mw: float,
-            prices,
+            all_data: pd.DataFrame,
             number_of_past_prices: int = 5
     ):
         self.battery_capacity_mwh = battery_capacity_mwh
         self.time_interval = 1/60  # 1 minute in hours
         self.charge_discharge_rate = charge_discharge_rate_mw
-        self.prices = prices
+        self.all_data = all_data
+        self.prices = all_data['Imbalance Price'].to_numpy()
         self.number_of_past_prices = number_of_past_prices
+        self.total_energy_traded_per_quarter = 0.0
 
-        self.max_steps = len(prices)
+        self.max_steps = len(self.prices)
         # State space, what the agent can observe
         num_of_dim = 2 + self.number_of_past_prices # [SoC, Price, past prices]
 
@@ -66,6 +69,10 @@ class BatteryTradingEnv(gym.Env):
         return obs, info
 
     def step(self, action):
+        # Reset total_energy_traded_per_quarter every quarter
+        if self.all_data.index[self.current_step].minute % 15 == 0:
+            self.total_energy_traded_per_quarter = 0.0
+
         x_t = 0.0 # Energy traded
         is_charged = None
         if action == 1: # Charge
@@ -108,7 +115,15 @@ class BatteryTradingEnv(gym.Env):
         ])
         info = {
             'energy_charged_discharged': actual_energy_traded,
+            'total_energy_traded_this_quarter': self.total_energy_traded_per_quarter,
         }
         self.current_step += 1
         return obs, reward, terminated, False, info
 
+
+    def _calculate_direct_reward(self, actual_energy_traded: float) -> float:
+        return -self.prices[self.current_step] * actual_energy_traded
+
+    def _calculate_delayed_reward(self):
+        # Reward based on price at the end of a quarter, this is also what businesses have to pay
+        return -self.prices[self.current_step] * self.total_energy_traded_per_quarter if self.all_data.index[self.current_step].minute % 15 == 14 else 0.0
