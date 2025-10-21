@@ -54,8 +54,21 @@ def plot_simulation_results_minute_by_minute(results: pd.DataFrame, start_minute
         return ""
 
     # Format string on given every 60 minutes on x-axis
+    plot_duration_minutes = end_minute - start_minute
+
+    # Choose a sensible interval for the x-axis ticks
+    if plot_duration_minutes <= 180:  # Up to 3 hours
+        locator_interval = 15  # A tick every 15 minutes
+    elif plot_duration_minutes <= 24 * 60:  # Up to 1 day
+        locator_interval = 120  # A tick every 2 hours
+    elif plot_duration_minutes <= 7 * 24 * 60:  # Up to 1 week
+        locator_interval = 24 * 60  # A tick every day
+    else:  # For longer periods
+        locator_interval = 7 * 24 * 60  # A tick every week
+
+    # Apply the formatter and the new dynamic locator
     ax1.xaxis.set_major_formatter(mticker.FuncFormatter(format_full_datetime_ticks))
-    ax1.xaxis.set_major_locator(mticker.MultipleLocator(60))
+    ax1.xaxis.set_major_locator(mticker.MultipleLocator(base=locator_interval))
 
     plt.title(f'Minute-by-Minute Simulation Results')
     fig.autofmt_xdate(rotation=30, ha='right')
@@ -63,7 +76,7 @@ def plot_simulation_results_minute_by_minute(results: pd.DataFrame, start_minute
 
     # Define the directory and filename for the plot
     plots_dir = 'plots'
-    filename = 'simulation_results.png'
+    filename = 'simulation_results_dqn_1.png'
     full_path = os.path.join(plots_dir, filename)
     os.makedirs(plots_dir, exist_ok=True)
 

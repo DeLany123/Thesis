@@ -1,7 +1,7 @@
-from Simulation.suite_simple_trading.model import BatteryTradingEnv
+from Simulation.suite_simple_trading.model import BatteryTradingEnv1, BaseBatteryEnv
 
 
-def run_evaluation(env: BatteryTradingEnv, decision_maker) -> dict:
+def run_evaluation(env: BaseBatteryEnv, decision_maker) -> dict:
     """
     Runs a single evaluation and returns a detailed history of the simulation.
     """
@@ -21,7 +21,7 @@ def run_evaluation(env: BatteryTradingEnv, decision_maker) -> dict:
 
         energy_charged_discharged = info.get('energy_charged_discharged', 0)
 
-        prices_history.append(obs[-1])
+        prices_history.append(obs[1])
         soc_history.append(env.soc_mwh)  # Get current SoC from the env
         action_history.append(action)
         reward_history.append(reward)
@@ -31,7 +31,7 @@ def run_evaluation(env: BatteryTradingEnv, decision_maker) -> dict:
 
     # Return all collected data in a dictionary
     return {
-        "prices": None,
+        "prices": prices_history,
         "soc": soc_history,
         "actions": action_history,
         "rewards": reward_history,

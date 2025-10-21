@@ -1,10 +1,11 @@
-from Simulation.suite_simple_trading.model import BatteryTradingEnv
+from Simulation.suite_simple_trading.model import BatteryTradingEnv1, BaseBatteryEnv
 import numpy as np
 
 from Simulation.suite_simple_trading.policy import QuarterlyTrendDecisionMaker
+from Simulation.suite_simple_trading.simulation import run_evaluation
 
 
-def perform_grid_search(env: BatteryTradingEnv, buy_range: np.ndarray, sell_range: np.ndarray):
+def perform_grid_search(env: BaseBatteryEnv, buy_range: np.ndarray, sell_range: np.ndarray):
     """
     Performs a grid search to find the optimal theta_buy and theta_sell values.
 

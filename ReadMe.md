@@ -13,20 +13,61 @@
     pip install -r requirements.txt
     ```
 
-3.  **Run the Simulation:**
-    Navigate to the `Simulation` directory and execute the driver script as a module. You can choose a mode to run.
-    New plots are saved to the `plots` directory.
+3.  **Train, Evaluate, and Tune Models:**
+    Navigate to the project's root directory (`ThesisGit`) and execute the driver script as a module. You must specify a `--mode`.
 
-    *   **Run a single simulation** with default parameters:
+    *   **Train the RL Agent:**
+        This will run the training process and save the model to `models/dqn_battery_trading_model.zip`.
         ```bash
-        python -m Simulation.suite_simple_trading.driver --mode run
+        python -m Simulation.suite_simple_trading.driver --mode train
         ```
 
-    *   **Run a grid search** to find the best heuristic parameters:
-        Here you can change the range in the code in `driver.py`.
+    *   **Run a Simulation:**
+        This evaluates a specific policy. New plots are saved to the `plots` directory.
+        ```bash
+        # Evaluate the default heuristic policy
+        python -m Simulation.suite_simple_trading.driver --mode run --policy heuristic
+
+        # Evaluate the trained RL agent
+        python -m Simulation.suite_simple_trading.driver --mode run --policy rl
+        ```
+
+    *   **Run a Grid Search** to find the best heuristic parameters:
         ```bash
         python -m Simulation.suite_simple_trading.driver --mode gridsearch
         ```
+
+### Command-Line Arguments
+You can customize the script's behavior using the following arguments:
+
+*   `--mode`: (Required) Specifies the operating mode.
+    *   `train`: Trains the DQN Reinforcement Learning agent.
+    *   `run`: Executes a single simulation run for evaluation.
+    *   `gridsearch`: Performs a full grid search on the heuristic policy.
+
+*   `--policy`: (Optional, for `run` mode) Selects the policy to evaluate.
+    *   `heuristic` (default): Uses the rule-based heuristic policy.
+    *   `rl`: Uses the pre-trained DQN agent.
+
+*   `--buy`: (Optional, for heuristic policy) Sets the buying/charging price threshold. Defaults to `10.0`.
+
+*   `--sell`: (Optional, for heuristic policy) Sets the selling/discharging price threshold. Defaults to `120.0`.
+
+*   `--start-date`: (Optional, for `run` mode) Sets the start of the plot window. Format: `"YYYY-MM-DD HH:MM:SS"`.
+
+*   `--end-date`: (Optional, for `run` mode) Sets the end of the plot window. Format: `"YYYY-MM-DD HH:MM:SS"`.
+
+#### Examples
+
+*   **Run the RL agent and plot the first day of 2025:**
+    ```bash
+    python -m Simulation.suite_simple_trading.driver --mode run --policy rl --start-date "2025-01-01" --end-date "2025-01-02"
+    ```
+
+*   **Run the heuristic with custom thresholds:**
+    ```bash
+    python -m Simulation.suite_simple_trading.driver --mode run --policy heuristic --buy 0 --sell 150
+    ```
 #### Command-Line Arguments
 You can customize the simulation using the following arguments:
 
@@ -138,4 +179,14 @@ Besproken om te onderzoeken.
 <li>Policyfamilies bekijken, uittesten, welke zien er veelbelovend uit, welke niet.</li>
 <li>Invloed van forecasting op het model</li>
 </ol>
+
+## 17/10
+### Model
+DQN agent opgezet in Simulation/suite_simple_trading/agents/dqn_agent.py.
+State space uitgebreid met meerdere relative oplaad levels.
+
+### Resulaten
+![DQN Training Progress](plots/simulation_results_dqn_1.png "DQN Training Progress")
+We zien dat het model enkel wilt kopen als het een negatief prijs heeft gezien in de state. Hierna probeert het heel 
+snel terug te verkopen voor een positieve prijs. En houdt waarschijnlijk nog geen rekening met een hoge prijs in de toekomst.
 

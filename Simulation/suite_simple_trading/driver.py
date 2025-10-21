@@ -3,33 +3,16 @@ import os
 
 import numpy as np
 import pandas as pd
+from stable_baselines3 import DQN
 
+from .dqn_driver import train_dqn_agent
 from .grid_search import perform_grid_search
 from .pre_processing import clean_data
 from .simulation import run_evaluation
-from .model import BatteryTradingEnv
-from .policy import QuarterlyTrendDecisionMaker, train_rl_agent
+from .model import BatteryTradingEnv2
+from .policy import QuarterlyTrendDecisionMaker, RLAgentDecisionMaker
 from .plotting import plot_simulation_results_minute_by_minute
 
-def simulate_policy(environment, all_data, theta_buy, theta_sell):
-    """
-    Simulates the trading policy over the given price data and returns the total profit.
-
-    Args:
-        environment: The Gymnasium environment instance.
-        all_data: The full DataF/home/lander/Documents/school/Thesis/ThesisGit/plotsrame containing the price data and timestamps.
-        theta_buy: The price threshold for buying/charging.
-        theta_sell: The price threshold for selling/discharging.
-    """
-    decision_maker = QuarterlyTrendDecisionMaker(
-        theta_buy=theta_buy,
-        theta_sell=theta_sell,
-        past_prices_needed=environment.number_of_past_prices
-    )
-    history_df = pd.DataFrame(run_evaluation(environment, decision_maker))
-    history_df['prices'] = environment.prices
-    history_df['Datetime'] = all_data['Datetime']
-    return history_df
 
 if __name__ == '__main__':
 
@@ -38,8 +21,16 @@ if __name__ == '__main__':
         '--mode',
         type=str,
         required=True,
-        choices=['gridsearch', 'run'],
+        choices=['gridsearch', 'run', 'train'],
         help="The mode to run the script in: 'gridsearch' to find best parameters, or 'run' to execute a single simulation."
+    )
+
+    parser.add_argument(
+        '--policy',
+        type=str,
+        default='heuristic',
+        choices=['heuristic', 'rl'],
+        help="Policy to use for 'run' mode: 'heuristic' or 'rl'. Defaults to 'heuristic'."
     )
 
     # Optional arguments
@@ -75,10 +66,18 @@ if __name__ == '__main__':
 
     all_data = cleaned_df[['Datetime','Imbalance Price']]
 
-    env = BatteryTradingEnv(
+    # Define the split point for the training data
+    split_fraction = 0.8
+    split_index = int(len(cleaned_df) * split_fraction)
+
+    # Create the training and testing DataFrames
+    train_df = all_data.iloc[:split_index]
+    test_df = all_data.iloc[split_index:].reset_index()
+
+    train_env = BatteryTradingEnv2(
         battery_capacity_mwh=10.0,
         charge_discharge_rate_mw=5.0,
-        all_data=all_data,
+        all_data=train_df,
         number_of_past_prices=5
     )
 
@@ -89,17 +88,48 @@ if __name__ == '__main__':
         buy_thresholds = np.arange(0, 51, 10)
         sell_thresholds = np.arange(100, 201, 20)
 
-        perform_grid_search(env, buy_thresholds, sell_thresholds)
+        perform_grid_search(train_env, buy_thresholds, sell_thresholds)
+
 
     elif args.mode == 'run':
         print(f"\n--- Starting Single Run Mode ---")
-        print(f"Using parameters: Buy Threshold = {args.buy}, Sell Threshold = {args.sell}")
+        decision_maker = None
 
-        history_df = simulate_policy(env, cleaned_df, args.buy, args.sell)
+        test_env = BatteryTradingEnv2(
+            battery_capacity_mwh=10.0,
+            charge_discharge_rate_mw=5.0,
+            all_data=test_df,
+            number_of_past_prices=5
+        )
 
-        start_minute_index = 0
-        end_minute_index = None
+        if args.policy == 'heuristic':
+            print(f"Policy: Heuristic")
+            print(f"Using parameters: Buy Threshold = {args.buy}, Sell Threshold = {args.sell}")
 
+            decision_maker = QuarterlyTrendDecisionMaker(
+                theta_buy=args.buy,
+                theta_sell=args.sell,
+                past_prices_needed=test_env.number_of_past_prices
+            )
+
+        elif args.policy == 'rl':
+            print(f"Policy: Reinforcement Learning (DQN)")
+            rl_model_path = 'models/dqn_battery_trading_model.zip'
+            try:
+                print(f"Loading trained model from: {rl_model_path}")
+                rl_model = DQN.load(rl_model_path)
+                decision_maker = RLAgentDecisionMaker(rl_model)
+
+            except FileNotFoundError:
+                print(f"Error: Trained model not found at '{rl_model_path}'.")
+                print("Please run the script with '--mode train' first.")
+                exit()
+
+        history_df = pd.DataFrame(run_evaluation(test_env, decision_maker))
+        history_df['Datetime'] = test_df['Datetime']
+
+        start_minute_index = history_df['Datetime'].searchsorted(history_df['Datetime'].iloc[0], side='left')
+        end_minute_index = start_minute_index + 10_080
         if args.start_date:
             try:
                 start_ts = pd.to_datetime(args.start_date, utc=True)
@@ -110,17 +140,27 @@ if __name__ == '__main__':
 
         if args.end_date:
             try:
-                end_ts = pd.to_datetime(args.end_date)
-                end_minute_index = history_df.index.searchsorted(end_ts)
+                end_ts = pd.to_datetime(args.end_date, utc=True)
+                end_minute_index = history_df['Datetime'].searchsorted(end_ts, side='right')
             except Exception as e:
                 print(f"Warning: Could not parse end-date '{args.end_date}'. Plotting until the end. Error: {e}")
-        else:
-            end_minute_index = start_minute_index + 1440 # Default to 1 day (1440 minutes)
+
+        # If no end date is given but a start date is, default to plotting one day
+        elif args.start_date:
+            end_minute_index = start_minute_index + 1440
 
         print(f"Plotting from minute {start_minute_index} to {end_minute_index}...")
-
         plot_simulation_results_minute_by_minute(history_df, start_minute_index, end_minute_index)
         print(f"Total Profit: {history_df['rewards'].sum():.2f} EUR")
+        test_env.close()
 
-    env.close()
+    elif args.mode == 'train':
+        print(f"\n--- Starting RL Agent Training Mode ---")
+        train_dqn_agent(
+            env=train_env,
+            model_save_path='models/dqn_battery_trading_model',
+            total_timesteps=100_000
+        )
+
+    train_env.close()
     print("\nScript finished.")
