@@ -21,18 +21,14 @@ def train_dqn_agent(
     """
     if dqn_params is None:
         dqn_params = {
-            'learning_rate': 1e-4,  # How big are the update steps for the neural network.
+            'learning_rate':5 * 1e-4,  # How big are the update steps for the neural network.
             'buffer_size': 100_000,
             # **EXPERIENCE REPLAY**: How many (state, action, reward, next_state) transitions to store.
-            'learning_starts': 5_000,  # How many random steps to take before starting to learn from the buffer.
-            'batch_size': 32,
+            'learning_starts': 100,  # How many random steps to take before starting to learn from the buffer.
+            'batch_size': 512,
             # **EXPERIENCE REPLAY**: How many transitions to sample from the buffer for each training update.
             'gamma': 0.99,  # Discount factor for future rewards.
-            'target_update_interval': 500,  # How often to update the 'fixed' target network.
-            'exploration_fraction': 0.1,  # Fraction of training to spend decreasing the exploration rate.
-            'exploration_final_eps': 0.05,  # The minimum exploration rate.
-            'verbose': 1,
-            'tensorboard_log': "./dqn_tensorboard_logs/"
+            'tau': 0.1
         }
 
     print("Creating the DQN agent...")

@@ -25,6 +25,7 @@ class BaseBatteryEnv(gym.Env):
         self.all_data = all_data
         self.prices = all_data['Imbalance Price'].to_numpy()
         self.number_of_past_prices = number_of_past_prices
+        self.total_energy_traded_per_quarter = 0
 
         self.max_steps = len(self.prices)
 
@@ -69,6 +70,13 @@ class BaseBatteryEnv(gym.Env):
         ])
         return obs
 
+    def _calculate_direct_reward(self, actual_energy_traded: float) -> float:
+        return -self.prices[self.current_step] * actual_energy_traded
+
+    def _calculate_delayed_reward(self):
+        # Reward based on price at the end of a quarter, this is also what businesses have to pay
+        return -self.prices[self.current_step] * self.total_energy_traded_per_quarter if self.all_data['Datetime'][self.current_step].minute % 15 == 14 else 0.0
+
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         self.current_step = 0
@@ -79,10 +87,12 @@ class BaseBatteryEnv(gym.Env):
         return obs, info
 
     def step(self, action: int):
-        # 1. Get power rate from the specific policy implementation
+        if self.all_data['Datetime'][self.current_step].minute % 15 == 0:
+            self.total_energy_traded_per_quarter = 0.0
+
+        # Get power rate from the specific policy implementation
         x_t = self._get_power_rate_from_action(action)
 
-        # --- (THE REST OF THE STEP LOGIC IS 100% SHARED AND LIVES HERE) ---
         energy_traded = x_t * self.time_interval
 
         if energy_traded > 0:
@@ -94,8 +104,9 @@ class BaseBatteryEnv(gym.Env):
 
         self.soc_mwh += actual_energy_traded
 
-        reward = -self.prices[self.current_step] * actual_energy_traded
+        reward = self._calculate_delayed_reward()
 
+        self.total_energy_traded_per_quarter += actual_energy_traded
         self.current_step += 1
         terminated = self.current_step >= self.max_steps - 1
 
