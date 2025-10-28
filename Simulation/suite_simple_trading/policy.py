@@ -133,3 +133,36 @@ class RLAgentDecisionMaker:
         """
         # A trained SB3 model is stateless between episodes, so nothing to do here.
         pass
+
+
+# In policy.py or decision_maker.py
+class PPOAgentDecisionMaker:
+    """
+    Wrapper for a trained Stable-Baselines3 agent.
+    Now handles action masks passed via the info dictionary.
+    """
+
+    def __init__(self, model):
+        self.model = model
+
+    def get_action(self, observation: np.ndarray, info: dict) -> int:
+        """
+        Predicts the best action, using an action mask if available.
+
+        Args:
+            observation: The current state observation.
+            info: The info dictionary from the environment, which may contain an 'action_mask'.
+        """
+        # Get the action mask from the info dictionary provided by the env
+        action_mask = info.get('action_mask')
+
+        # Pass the mask to the predict method
+        action, _states = self.model.predict(
+            observation,
+            deterministic=True,
+            action_masks=action_mask  # This is the key change
+        )
+        return int(action)
+
+    def reset(self):
+        pass

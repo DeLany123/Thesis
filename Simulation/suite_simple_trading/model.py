@@ -153,3 +153,34 @@ class BatteryTradingEnv2(BaseBatteryEnv):
     def _get_power_rate_from_action(self, action: int) -> float:
         percentage = self.action_to_percentage[action]
         return self.charge_discharge_rate * percentage
+
+
+class BatteryTradingEnvMasking(BatteryTradingEnv1):
+    """
+    An environment that extends BatteryTradingEnv1 by adding action masking.
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def action_masks(self) -> np.ndarray:
+        """
+        Returns binary mask indicating what actions are valid in the current state.
+        This method is automatically called by MaskablePPO.
+        """
+        mask = [1, 1, 1]
+        if self.soc_mwh >= self.battery_capacity_mwh: mask[1] = 0
+        if self.soc_mwh <= 0: mask[2] = 0
+        return np.array(mask, dtype=np.int8)
+
+    def reset(self, seed=None, options=None):
+        obs, info = super().reset(seed=seed, options=options)
+        action_mask = self.action_masks()
+        info['action_mask'] = action_mask
+        return obs, info
+
+    def step(self, action: int):
+        obs, reward, terminated, truncated, info = super().step(action)
+        action_mask = self.action_masks()
+        info['action_mask'] = action_mask
+        return obs, reward, terminated, truncated, info

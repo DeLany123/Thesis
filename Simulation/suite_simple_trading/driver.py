@@ -3,14 +3,16 @@ import os
 
 import numpy as np
 import pandas as pd
+from sb3_contrib import MaskablePPO
+from sb3_contrib.common.wrappers import ActionMasker
 from sklearn.model_selection import TimeSeriesSplit
 from stable_baselines3 import DQN
 
-from .dqn_driver import train_dqn_agent
+from .agent_trainer import train_dqn_agent, train_ppo_agent
 from .grid_search import perform_grid_search
 from .pre_processing import clean_data
 from .simulation import run_evaluation
-from .model import BatteryTradingEnv2
+from .model import BatteryTradingEnv2, BatteryTradingEnvMasking
 from .policy import QuarterlyTrendDecisionMaker, RLAgentDecisionMaker
 from .plotting import plot_simulation_results_minute_by_minute
 
@@ -24,6 +26,12 @@ if __name__ == '__main__':
     subparsers = parser.add_subparsers(dest='command', required=True, help='Mode of execution')
 
     rl_mode = subparsers.add_parser('rl', help='Start the program in RL mode')
+    rl_mode.add_argument(
+        '--method',
+        default='dqn',
+        choices=['dqn', 'ppo'],
+        help='Reinforcement learning method to use'
+    )
     rl_mode.add_argument(
         '--mode',
         default='run',
@@ -104,83 +112,118 @@ if __name__ == '__main__':
     decision_maker = None
 
     if args.command == 'rl':
-        if args.mode == 'run':
-            # Any mode in run, runs on test data
-            rl_model_path = 'models/dqn_battery_trading_model.zip'
+        if args.method == 'dqn':
+            if args.mode == 'run':
+                # Any mode in run, runs on test data
+                rl_model_path = 'models/dqn_battery_trading_model.zip'
 
-            try:
-                print(f"Loading trained model from: {rl_model_path}")
-                rl_model = DQN.load(rl_model_path)
-                decision_maker = RLAgentDecisionMaker(rl_model)
+                try:
+                    print(f"Loading trained model from: {rl_model_path}")
+                    rl_model = DQN.load(rl_model_path)
+                    decision_maker = RLAgentDecisionMaker(rl_model)
 
-            except FileNotFoundError:
-                print(f"Error: Trained model not found at '{rl_model_path}'.")
-                print("Please run the script with '--mode train' first.")
+                except FileNotFoundError:
+                    print(f"Error: Trained model not found at '{rl_model_path}'.")
+                    print("Please run the script with '--mode train' first.")
+                    exit()
+
+            elif args.mode == 'train':
+                print(f"\n--- Starting RL Agent Training Mode ---")
+                train_dqn_agent(
+                    env=train_env,
+                    model_save_path='models/dqn_battery_trading_model',
+                    total_timesteps=3*len(train_df), # TODO should be argument
+                )
+                print("--- Training Finished ---")
+                train_env.close()
+                test_env.close()
                 exit()
 
-        elif args.mode == 'train':
-            print(f"\n--- Starting RL Agent Training Mode ---")
-            train_dqn_agent(
-                env=train_env,
-                model_save_path='models/dqn_battery_trading_model',
-                total_timesteps=3*len(train_df),
-            )
-            print("--- Training Finished ---")
-            train_env.close()
-            test_env.close()
-            exit()
+            elif args.mode == 'test':
+                print("\n--- Starting Time-Series Cross-Validation Mode ---")
 
-        elif args.mode == 'test':
-            print("\n--- Starting Time-Series Cross-Validation Mode ---")
+                n_splits = 3
+                gap_size = 1440
 
-            n_splits = 3
-            gap_size = 1440
+                tscv = TimeSeriesSplit(n_splits=n_splits, gap=gap_size)
+                fold_results = []
 
-            tscv = TimeSeriesSplit(n_splits=n_splits, gap=gap_size)
-            fold_results = []
+                for fold, (train_index, test_index) in enumerate(tscv.split(all_data)):
+                    print(f"\n----- FOLD {fold + 1}/{n_splits} -----")
 
-            for fold, (train_index, test_index) in enumerate(tscv.split(all_data)):
-                print(f"\n----- FOLD {fold + 1}/{n_splits} -----")
+                    train_df = all_data.iloc[train_index]
+                    test_df = all_data.iloc[test_index]
 
-                train_df = all_data.iloc[train_index]
-                test_df = all_data.iloc[test_index]
+                    print(f"Training on {len(train_df)} samples, testing on {len(test_df)} samples.")
 
-                print(f"Training on {len(train_df)} samples, testing on {len(test_df)} samples.")
+                    train_env = BatteryTradingEnv2(
+                        battery_capacity_mwh=10.0,
+                        charge_discharge_rate_mw=5.0,
+                        all_data=train_df,
+                        number_of_past_prices=5
+                    )
 
-                train_env = BatteryTradingEnv2(
+                    model_path_for_fold = f"models/dqn_model_fold_{fold + 1}"
+                    train_dqn_agent(
+                        env=train_env,
+                        model_save_path=model_path_for_fold,
+                        total_timesteps=100_000
+                    )
+
+                    test_env = BatteryTradingEnv2(
+                        battery_capacity_mwh=10.0,
+                        charge_discharge_rate_mw=5.0,
+                        all_data=test_df,
+                        number_of_past_prices=5
+                    )
+
+                    rl_model = DQN.load(f"{model_path_for_fold}.zip")
+                    decision_maker = RLAgentDecisionMaker(rl_model)
+
+                    history_df = run_evaluation(test_env, decision_maker)
+                    fold_profit = history_df['rewards'].sum()
+                    fold_results.append(fold_profit)
+                    print(f"Profit for Fold {fold + 1}: {fold_profit:.2f} EUR")
+
+                print("\n--- Cross-Validation Summary ---")
+                mean_profit = np.mean(fold_results)
+                std_profit = np.std(fold_results)
+                print(f"Average Profit across {n_splits} folds: {mean_profit:.2f} EUR")
+                print(f"Standard Deviation of Profit: {std_profit:.2f} EUR")
+
+        elif args.method == 'ppo':
+            if args.mode == 'train':
+                print(f"\n--- Starting PPO RL Agent Training Mode ---")
+                train_env = BatteryTradingEnvMasking(
                     battery_capacity_mwh=10.0,
                     charge_discharge_rate_mw=5.0,
                     all_data=train_df,
                     number_of_past_prices=5
                 )
-
-                model_path_for_fold = f"models/dqn_model_fold_{fold + 1}"
-                train_dqn_agent(
+                train_ppo_agent(
                     env=train_env,
-                    model_save_path=model_path_for_fold,
-                    total_timesteps=100_000
+                    model_save_path='models/ppo_battery_trading_model',
+                    total_timesteps=3*len(train_df),
                 )
 
-                test_env = BatteryTradingEnv2(
+            elif args.mode == 'run':
+                print(f"\n--- Starting PPO RL Agent Run Mode ---")
+                test_env = BatteryTradingEnvMasking(
                     battery_capacity_mwh=10.0,
                     charge_discharge_rate_mw=5.0,
                     all_data=test_df,
                     number_of_past_prices=5
                 )
 
-                rl_model = DQN.load(f"{model_path_for_fold}.zip")
-                decision_maker = RLAgentDecisionMaker(rl_model)
+                model_path = 'models/ppo_battery_model.zip'
+                try:
+                    rl_model = MaskablePPO.load(model_path)
+                    decision_maker = RLAgentDecisionMaker(rl_model)
+                    history_df = run_evaluation(test_env, decision_maker)
+                except FileNotFoundError:
+                    print(f"Error: Trained PPO model not found at '{model_path}'.")
+                    exit()
 
-                history_df = run_evaluation(test_env, decision_maker)
-                fold_profit = history_df['rewards'].sum()
-                fold_results.append(fold_profit)
-                print(f"Profit for Fold {fold + 1}: {fold_profit:.2f} EUR")
-
-            print("\n--- Cross-Validation Summary ---")
-            mean_profit = np.mean(fold_results)
-            std_profit = np.std(fold_results)
-            print(f"Average Profit across {n_splits} folds: {mean_profit:.2f} EUR")
-            print(f"Standard Deviation of Profit: {std_profit:.2f} EUR")
 
     elif args.command == 'heuristic':
         if args.mode == 'run':
