@@ -24,7 +24,7 @@ def train_dqn_agent(
             'learning_rate':5 * 1e-4,  # How big are the update steps for the neural network.
             'buffer_size': 100_000,
             # **EXPERIENCE REPLAY**: How many (state, action, reward, next_state) transitions to store.
-            'learning_starts': 100,  # How many random steps to take before starting to learn from the buffer.
+            'learning_starts': 1000,  # How many random steps to take before starting to learn from the buffer.
             'batch_size': 512,
             # **EXPERIENCE REPLAY**: How many transitions to sample from the buffer for each training update.
             'gamma': 0.99,  # Discount factor for future rewards.

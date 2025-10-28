@@ -14,88 +14,70 @@
     ```
 
 3.  **Train, Evaluate, and Tune Models:**
-    Navigate to the project's root directory (`ThesisGit`) and execute the driver script as a module. You must specify a `--mode`.
+    Navigate to the project's root directory (`ThesisGit`) and execute the driver script as a module. You must specify a command (`rl` or `heuristic`) followed by its arguments. New plots are saved to the `plots` directory.
 
     *   **Train the RL Agent:**
-        This will run the training process and save the model to `models/dqn_battery_trading_model.zip`.
         ```bash
-        python -m Simulation.suite_simple_trading.driver --mode train
+        python -m Simulation.suite_simple_trading.driver rl --mode train
         ```
 
-    *   **Run a Simulation:**
-        This evaluates a specific policy. New plots are saved to the `plots` directory.
+    *   **Evaluate the trained RL Agent:**
         ```bash
-        # Evaluate the default heuristic policy
-        python -m Simulation.suite_simple_trading.driver --mode run --policy heuristic
-
-        # Evaluate the trained RL agent
-        python -m Simulation.suite_simple_trading.driver --mode run --policy rl
+        python -m Simulation.suite_simple_trading.driver rl --mode run
+        ```
+    
+    *   **Evaluate the Heuristic Policy:**
+        ```bash
+        python -m Simulation.suite_simple_trading.driver heuristic --mode run
         ```
 
-    *   **Run a Grid Search** to find the best heuristic parameters:
+    *   **Run a Grid Search** for the heuristic policy:
         ```bash
-        python -m Simulation.suite_simple_trading.driver --mode gridsearch
+        python -m Simulation.suite_simple_trading.driver heuristic --mode gridsearch
+        ```
+    
+    *   **Run Cross-Validation** for the RL agent:
+        ```bash
+        python -m Simulation.suite_simple_trading.driver rl --mode test
         ```
 
 ### Command-Line Arguments
-You can customize the script's behavior using the following arguments:
 
-*   `--mode`: (Required) Specifies the operating mode.
-    *   `train`: Trains the DQN Reinforcement Learning agent.
-    *   `run`: Executes a single simulation run for evaluation.
-    *   `gridsearch`: Performs a full grid search on the heuristic policy.
+The script uses two main commands: `rl` and `heuristic`. Each has its own set of options.
 
-*   `--policy`: (Optional, for `run` mode) Selects the policy to evaluate.
-    *   `heuristic` (default): Uses the rule-based heuristic policy.
-    *   `rl`: Uses the pre-trained DQN agent.
+#### `rl` Command
+Used for training, evaluating, and testing the Reinforcement Learning agent.
 
-*   `--buy`: (Optional, for heuristic policy) Sets the buying/charging price threshold. Defaults to `10.0`.
+*   `--mode`: (Optional) Specifies the operating mode for the RL agent. Defaults to `run`.
+    *   `train`: Trains the DQN agent on the training dataset and saves the model.
+    *   `run`: Evaluates the pre-trained DQN agent on the test dataset.
+    *   `test`: Performs a full time-series cross-validation.
+*   `--start-date`: (Optional, for `run` mode) Sets the start of the plot window. Format: `"YYYY-MM-DD"`.
+*   `--end-date`: (Optional, for `run` mode) Sets the end of the plot window. Format: `"YYYY-MM-DD"`.
 
-*   `--sell`: (Optional, for heuristic policy) Sets the selling/discharging price threshold. Defaults to `120.0`.
+#### `heuristic` Command
+Used for evaluating and tuning the rule-based heuristic policy.
 
-*   `--start-date`: (Optional, for `run` mode) Sets the start of the plot window. Format: `"YYYY-MM-DD HH:MM:SS"`.
+*   `--mode`: (Optional) Specifies the operating mode for the heuristic. Defaults to `run`.
+    *   `run`: Executes a single simulation run on the test dataset.
+    *   `gridsearch`: Performs a full grid search to find optimal `buy` and `sell` thresholds.
+*   `--buy`: (Optional, for `run` mode) Sets the buying/charging price threshold. Defaults to `10.0`.
+*   `--sell`: (Optional, for `run` mode) Sets the selling/discharging price threshold. Defaults to `120.0`.
+*   `--start-date`: (Optional, for `run` mode) Sets the start of the plot window. Format: `"YYYY-MM-DD"`.
+*   `--end-date`: (Optional, for `run` mode) Sets the end of the plot window. Format: `"YYYY-MM-DD"`.
 
-*   `--end-date`: (Optional, for `run` mode) Sets the end of the plot window. Format: `"YYYY-MM-DD HH:MM:SS"`.
+### Examples
 
-#### Examples
-
-*   **Run the RL agent and plot the first day of 2025:**
+*   **Run the RL agent and plot the first week of the test period:**
     ```bash
-    python -m Simulation.suite_simple_trading.driver --mode run --policy rl --start-date "2025-01-01" --end-date "2025-01-02"
+    python -m Simulation.suite_simple_trading.driver rl --mode run --start-date "2025-01-01" --end-date "2025-01-08"
     ```
 
 *   **Run the heuristic with custom thresholds:**
     ```bash
-    python -m Simulation.suite_simple_trading.driver --mode run --policy heuristic --buy 0 --sell 150
+    python -m Simulation.suite_simple_trading.driver heuristic --mode run --buy 0 --sell 150
     ```
-#### Command-Line Arguments
-You can customize the simulation using the following arguments:
-
-*   `--mode`: (Required) Specifies the operating mode.
-    *   `run`: Executes a single simulation run.
-    *   `gridsearch`: Performs a full grid search to find optimal `buy` and `sell` thresholds.
-
-*   `--buy`: (Optional, for `run` mode) Sets the buying/charging price threshold. Defaults to `10.0`.
-    *   Example: `--buy 0`
-
-*   `--sell`: (Optional, for `run` mode) Sets the selling/discharging price threshold. Defaults to `120.0`.
-    *   Example: `--sell 150`
-
-*   `--start-date`: (Optional, for `run` mode) Sets the start timestamp for the plot window.
-    *   Format: `"YYYY-MM-DD HH:MM:SS"` Also possible without the time part, e.g. `"2025-01-15"`
-    *   Default: `"2025-01-01 00:00:00"`
-    *   Example: `--start-date "2025-01-15 08:00:00"`
-
-*   `--end-date`: (Optional, for `run` mode) Sets the end timestamp for the plot window.
-    *   Format: `"YYYY-MM-DD HH:MM:SS"` Also possible without the time part, e.g. `"2025-01-15"`
-    *   Default: 1 day after the start date
-    *   Example: `--end-date "2025-01-15 17:00:00"`
-
-**Example with Custom Parameters:**
-To run a single simulation and plot only the morning of January 15th:
-```bash
-python -m Simulation.suite_simple_trading.driver --mode run --buy 0 --sell 150 --start-date "2025-01-15 06:00:00" --end-date "2025-01-15 12:00:00"
-```
+    
 
 # Overzicht vooruitgang
 
@@ -190,3 +172,18 @@ State space uitgebreid met meerdere relative oplaad levels.
 We zien dat het model enkel wilt kopen als het een negatief prijs heeft gezien in de state. Hierna probeert het heel 
 snel terug te verkopen voor een positieve prijs. En houdt waarschijnlijk nog geen rekening met een hoge prijs in de toekomst.
 
+## 28/10
+Lang gewerkt aan revampen van het model. Meer in de literatuur gedoken om bij te lezen over de verschillende oplosmethodes.
+Geleerd hoe DQN werkt.
+
+### Overleg
+Overleg gehad met Professor Claeys en Naim over aanpak van het verbeteren van de resultaten.
+Conclusie was het niet uitbereiden van het model, dit zou de resultaten nog oninterpreteerbaarder maken.
+De volgende stap is om Decision masking te implementeren. Nu worden sommige acties geblockt omdat bijvoorbeeld de batterij vol is.
+Het netwerk leert wel nog dat deze beslissing de beste is, en slaat deze op in de lookup table (zie DQN). We moeten er nu voor
+zorgen dat deze acties niet meer gekozen kunnen worden in het netwerk zelf. 
+In de volgende repo zouden er modellen moeten zijn die decision masking ondersteunen.  
+https://sb3-contrib.readthedocs.io/en/master/  
+
+Daarnaast kan er ook gekeken worden of er niet aan aggregatie kan gedaan worden van actions. Dat bijvoorbeeld elke 5 minuten
+een actie genomen wordt voor de volgende 5. Hiermee kunnen we effecten van de delayed reward wat verminderen.
