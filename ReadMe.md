@@ -1,3 +1,7 @@
+# Codebase
+The relevant code files are under the `Simulation/suite_simple_trading/` directory.  
+The starting point is the `driver.py` script, which handles command-line arguments and orchestrates the training, evaluation, and tuning of models.
+
 # Run the Project
 
 1.  **Set up the Environment:**
