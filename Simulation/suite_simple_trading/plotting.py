@@ -6,7 +6,12 @@ import matplotlib.ticker as mticker
 import numpy as np
 
 
-def plot_simulation_results_minute_by_minute(results: pd.DataFrame, start_minute: int = 0, end_minute: int = 1440):
+def plot_simulation_results_minute_by_minute(
+        results: pd.DataFrame,
+        filename: str,
+        start_minute: int = 0,
+        end_minute: int = 1440
+):
     """
     Plots minute-by-minute results with full date and time labels,
     derived from the 'datetimes' key in the results.
@@ -20,7 +25,7 @@ def plot_simulation_results_minute_by_minute(results: pd.DataFrame, start_minute
     color = 'tab:blue'
     ax1.set_xlabel('Date and Time')
     ax1.set_ylabel('Price (€/MWh)', color=color)
-    # Gebruik de integer-index van de geslicede DataFrame voor de x-as
+
     ax1.plot(plot_df.index, plot_df['prices'], color=color, linestyle='-', label='Price')
     ax1.tick_params(axis='y', labelcolor=color)
     ax1.grid(True, linestyle='--', alpha=0.6)
@@ -76,7 +81,6 @@ def plot_simulation_results_minute_by_minute(results: pd.DataFrame, start_minute
 
     # Define the directory and filename for the plot
     plots_dir = 'plots'
-    filename = 'simulation_results_dqn_1.png'
     full_path = os.path.join(plots_dir, filename)
     os.makedirs(plots_dir, exist_ok=True)
 

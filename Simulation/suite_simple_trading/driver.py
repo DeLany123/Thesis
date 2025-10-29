@@ -4,7 +4,6 @@ import os
 import numpy as np
 import pandas as pd
 from sb3_contrib import MaskablePPO
-from sb3_contrib.common.wrappers import ActionMasker
 from sklearn.model_selection import TimeSeriesSplit
 from stable_baselines3 import DQN
 
@@ -116,7 +115,6 @@ if __name__ == '__main__':
             if args.mode == 'run':
                 # Any mode in run, runs on test data
                 rl_model_path = 'models/dqn_battery_trading_model.zip'
-
                 try:
                     print(f"Loading trained model from: {rl_model_path}")
                     rl_model = DQN.load(rl_model_path)
@@ -205,6 +203,7 @@ if __name__ == '__main__':
                     model_save_path='models/ppo_battery_trading_model',
                     total_timesteps=3*len(train_df),
                 )
+                exit()
 
             elif args.mode == 'run':
                 print(f"\n--- Starting PPO RL Agent Run Mode ---")
@@ -215,7 +214,7 @@ if __name__ == '__main__':
                     number_of_past_prices=5
                 )
 
-                model_path = 'models/ppo_battery_model.zip'
+                model_path = 'models/ppo_battery_trading_model.zip'
                 try:
                     rl_model = MaskablePPO.load(model_path)
                     decision_maker = RLAgentDecisionMaker(rl_model)
@@ -223,7 +222,6 @@ if __name__ == '__main__':
                 except FileNotFoundError:
                     print(f"Error: Trained PPO model not found at '{model_path}'.")
                     exit()
-
 
     elif args.command == 'heuristic':
         if args.mode == 'run':
@@ -270,7 +268,22 @@ if __name__ == '__main__':
         end_minute_index = start_minute_index + 1440
 
     print(f"Plotting from minute {start_minute_index} to {end_minute_index}...")
-    plot_simulation_results_minute_by_minute(history_df, start_minute_index, end_minute_index)
+
+    if args.method == 'ppo':
+        plot_simulation_results_minute_by_minute(
+            history_df,
+            'simulation_results_ppo_1',
+            start_minute_index,
+            end_minute_index
+        )
+    elif args.method == "dqn":
+        plot_simulation_results_minute_by_minute(
+            history_df,
+            'simulation_results_dqn_1',
+            start_minute_index,
+            end_minute_index
+        )
+
     print(f"Total Profit: {history_df['rewards'].sum():.2f} EUR")
     test_env.close()
     train_env.close()
