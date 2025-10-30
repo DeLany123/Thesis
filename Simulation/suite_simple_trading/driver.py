@@ -11,13 +11,11 @@ from .agent_trainer import train_dqn_agent, train_ppo_agent
 from .grid_search import perform_grid_search
 from .pre_processing import clean_data
 from .simulation import run_evaluation
-from .model import BatteryTradingEnv2, BatteryTradingEnvMasking
+from .model import BatteryTradingEnv2, BatteryTradingEnvMasking, BatteryTradingEnv1
 from .policy import QuarterlyTrendDecisionMaker, RLAgentDecisionMaker
 from .plotting import plot_simulation_results_minute_by_minute
 
-
 TRAIN_TEST_SPLIT_FRACTION = 0.8
-
 
 if __name__ == '__main__':
 
@@ -60,7 +58,8 @@ if __name__ == '__main__':
 
     # Optional arguments
     heuristic_mode.add_argument('--buy', type=float, default=10.0, help="The buy/charge threshold for a single run.")
-    heuristic_mode.add_argument('--sell', type=float, default=120.0, help="The sell/discharge threshold for a single run.")
+    heuristic_mode.add_argument('--sell', type=float, default=120.0,
+                                help="The sell/discharge threshold for a single run.")
     heuristic_mode.add_argument(
         '--start-date',
         type=str,
@@ -89,19 +88,28 @@ if __name__ == '__main__':
         print(f"Saving cleaned data to cache: {cleaned_data_cache_path}")
         cleaned_df.to_pickle(cleaned_data_cache_path)
 
-    all_data = cleaned_df[['Datetime','Imbalance Price']]
-    split_index = int(len(cleaned_df) * TRAIN_TEST_SPLIT_FRACTION)
-    train_df = all_data.iloc[:split_index]
-    test_df = all_data.iloc[split_index:].reset_index()
+    all_data = cleaned_df[['Datetime', 'Imbalance Price']]
+    # Calculate the initial, approximate split point (e.g., at 80%)
+    initial_split_index = int(len(all_data) * TRAIN_TEST_SPLIT_FRACTION)
+    final_split_index = initial_split_index
 
-    train_env = BatteryTradingEnv2(
+    # Loop forward from the initial point until we find the start of a quarter
+    for i in range(initial_split_index, len(all_data)):
+        if all_data['Datetime'].iloc[i].minute % 15 == 0:
+            final_split_index = i
+            break
+
+    train_df = all_data.iloc[:final_split_index]
+    test_df = all_data.iloc[final_split_index:].reset_index()
+
+    train_env = BatteryTradingEnv1(
         battery_capacity_mwh=10.0,
         charge_discharge_rate_mw=5.0,
         all_data=train_df,
         number_of_past_prices=5
     )
 
-    test_env = BatteryTradingEnv2(
+    test_env = BatteryTradingEnv1(
         battery_capacity_mwh=10.0,
         charge_discharge_rate_mw=5.0,
         all_data=test_df,
@@ -109,9 +117,11 @@ if __name__ == '__main__':
     )
 
     decision_maker = None
+    method = ''
 
     if args.command == 'rl':
         if args.method == 'dqn':
+            method = 'dqn'
             if args.mode == 'run':
                 # Any mode in run, runs on test data
                 rl_model_path = 'models/dqn_battery_trading_model.zip'
@@ -130,7 +140,7 @@ if __name__ == '__main__':
                 train_dqn_agent(
                     env=train_env,
                     model_save_path='models/dqn_battery_trading_model',
-                    total_timesteps=3*len(train_df), # TODO should be argument
+                    total_timesteps=3 * len(train_df),  # TODO should be argument
                 )
                 print("--- Training Finished ---")
                 train_env.close()
@@ -190,6 +200,7 @@ if __name__ == '__main__':
                 print(f"Standard Deviation of Profit: {std_profit:.2f} EUR")
 
         elif args.method == 'ppo':
+            method = 'ppo'
             if args.mode == 'train':
                 print(f"\n--- Starting PPO RL Agent Training Mode ---")
                 train_env = BatteryTradingEnvMasking(
@@ -201,7 +212,7 @@ if __name__ == '__main__':
                 train_ppo_agent(
                     env=train_env,
                     model_save_path='models/ppo_battery_trading_model',
-                    total_timesteps=3*len(train_df),
+                    total_timesteps=3 * len(train_df),
                 )
                 exit()
 
@@ -218,18 +229,19 @@ if __name__ == '__main__':
                 try:
                     rl_model = MaskablePPO.load(model_path)
                     decision_maker = RLAgentDecisionMaker(rl_model)
-                    history_df = run_evaluation(test_env, decision_maker)
                 except FileNotFoundError:
                     print(f"Error: Trained PPO model not found at '{model_path}'.")
                     exit()
 
     elif args.command == 'heuristic':
+        method = 'heuristic'
         if args.mode == 'run':
 
             decision_maker = QuarterlyTrendDecisionMaker(
                 theta_buy=args.buy,
                 theta_sell=args.sell,
-                past_prices_needed=test_env.number_of_past_prices
+                past_prices_needed=test_env.number_of_past_prices,
+                date_times=test_env.all_data['Datetime'].values
             )
 
         elif args.mode == 'gridsearch':
@@ -269,20 +281,12 @@ if __name__ == '__main__':
 
     print(f"Plotting from minute {start_minute_index} to {end_minute_index}...")
 
-    if args.method == 'ppo':
-        plot_simulation_results_minute_by_minute(
-            history_df,
-            'simulation_results_ppo_1',
-            start_minute_index,
-            end_minute_index
-        )
-    elif args.method == "dqn":
-        plot_simulation_results_minute_by_minute(
-            history_df,
-            'simulation_results_dqn_1',
-            start_minute_index,
-            end_minute_index
-        )
+    plot_simulation_results_minute_by_minute(
+        history_df,
+        f'simulation_results_{method}_1',
+        start_minute_index,
+        end_minute_index
+    )
 
     print(f"Total Profit: {history_df['rewards'].sum():.2f} EUR")
     test_env.close()

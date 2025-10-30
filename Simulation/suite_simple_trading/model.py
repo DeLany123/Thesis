@@ -54,6 +54,13 @@ class BaseBatteryEnv(gym.Env):
         """
         raise NotImplementedError("This method must be implemented by the subclass.")
 
+    def get_idle_action(self) -> int:
+        """
+        Abstract method: Subclasses MUST implement this to return the action
+        corresponding to 'Idle' (no charge/discharge).
+        """
+        raise NotImplementedError("This method must be implemented by the subclass.")
+
     def _get_observation(self) -> np.ndarray:
         """Helper function to create the observation array."""
         start_index = max(0, self.current_step - self.number_of_past_prices)
@@ -103,15 +110,16 @@ class BaseBatteryEnv(gym.Env):
             actual_energy_traded = 0.0
 
         self.soc_mwh += actual_energy_traded
+        self.total_energy_traded_per_quarter += actual_energy_traded
 
         reward = self._calculate_delayed_reward()
 
-        self.total_energy_traded_per_quarter += actual_energy_traded
-        self.current_step += 1
-        terminated = self.current_step >= self.max_steps - 1
-
+        terminated = self.current_step + 1 >= self.max_steps
         obs = self._get_observation() if not terminated else self.observation_space.sample()
         info = {'energy_charged_discharged': actual_energy_traded}
+
+        self.current_step += 1
+
 
         return obs, reward, terminated, False, info
 
@@ -135,6 +143,9 @@ class BatteryTradingEnv1(BaseBatteryEnv):
         elif action == 2:  # Discharge
             return -self.charge_discharge_rate
 
+    def get_idle_action(self) -> int:
+        return 0
+
 
 class BatteryTradingEnv2(BaseBatteryEnv):
     """
@@ -154,6 +165,8 @@ class BatteryTradingEnv2(BaseBatteryEnv):
         percentage = self.action_to_percentage[action]
         return self.charge_discharge_rate * percentage
 
+    def get_idle_action(self) -> int:
+        return 5
 
 class BatteryTradingEnvMasking(BatteryTradingEnv1):
     """

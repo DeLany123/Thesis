@@ -13,7 +13,7 @@ class QuarterlyTrendDecisionMaker:
     remainder of that quarter.
     """
 
-    def __init__(self, theta_buy: float, theta_sell: float, past_prices_needed: int):
+    def __init__(self, theta_buy: float, theta_sell: float, past_prices_needed: int, date_times: np.ndarray):
         """
         Initializes the decision maker with its specific parameters.
 
@@ -29,6 +29,10 @@ class QuarterlyTrendDecisionMaker:
         # Internal state for the manager logic
         self.quarterly_decision = 0  # 0: Idle, 1: Charge, 2: Discharge
         self.decision_made_this_quarter = False
+
+        # Extra data needed
+        datetime_index = pd.to_datetime(date_times, utc=True)
+        self.minutes = datetime_index.minute.to_numpy()
 
     def reset(self):
         """
@@ -49,7 +53,8 @@ class QuarterlyTrendDecisionMaker:
         Returns:
             The integer action to be taken.
         """
-        current_minute_of_quarter = current_step % 15
+        current_minute = self.minutes[current_step]
+        current_minute_of_quarter = current_minute % 15
 
         # --- Quarterly Reset Logic ---
         if current_minute_of_quarter == 0:
@@ -57,7 +62,7 @@ class QuarterlyTrendDecisionMaker:
             self.decision_made_this_quarter = False
 
         # --- Decision Making Logic ---
-        if current_step >= self.past_prices_needed and not self.decision_made_this_quarter:
+        if not self.decision_made_this_quarter:
 
             # This is the actual heuristic policy logic
             policy_action = self._trend_based_heuristic(observation)
