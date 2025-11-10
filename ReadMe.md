@@ -191,3 +191,19 @@ https://sb3-contrib.readthedocs.io/en/master/
 
 Daarnaast kan er ook gekeken worden of er niet aan aggregatie kan gedaan worden van actions. Dat bijvoorbeeld elke 5 minuten
 een actie genomen wordt voor de volgende 5. Hiermee kunnen we effecten van de delayed reward wat verminderen.
+
+
+## 1/11
+### PPO Agent
+PPO agent opgezet. Programma heeft nu extra command line argumenten om te kiezen tussen DQN en PPO.
+Resultaten van PPO waren direct beter als dat van DQN.
+![DQN Training Progress](plots/simulation_results_ppo_1_version1.png "PPO results")
+Er is een duidelijkere policy keuze zichtbaar. De agent koopt bij negatieve prijzen en verkoopt bij positieve prijzen.
+Iets wat nog niet te zien was bij de DQN agent.
+
+### Runtime
+Na het uitproberen van verschillende ordes van total_timesteps ( dit is het aantal stappen dat de agent leert ) werd het
+al snel duidelijk dat de resultaten niet veel slechter werden bij een veel kleinere aantal stappen.  
+
+10_000 stappen geeft met dit model hetzelfde restulaat als 1_000_000 stappen. Dit is een groot verschil in runtime.
+

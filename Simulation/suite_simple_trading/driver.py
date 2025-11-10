@@ -7,11 +7,12 @@ from sb3_contrib import MaskablePPO
 from sklearn.model_selection import TimeSeriesSplit
 from stable_baselines3 import DQN
 
+from Simulation.suite_simple_trading.model_old import BatteryTradingEnv1, BatteryTradingEnv2
 from .agent_trainer import train_dqn_agent, train_ppo_agent
 from .grid_search import perform_grid_search
 from .pre_processing import clean_data
 from .simulation import run_evaluation
-from .model import BatteryTradingEnv2, BatteryTradingEnvMasking, BatteryTradingEnv1
+from .model import ExtendedBatteryEnv
 from .policy import QuarterlyTrendDecisionMaker, RLAgentDecisionMaker
 from .plotting import plot_simulation_results_minute_by_minute
 
@@ -188,10 +189,11 @@ if __name__ == '__main__':
                     rl_model = DQN.load(f"{model_path_for_fold}.zip")
                     decision_maker = RLAgentDecisionMaker(rl_model)
 
-                    history_df = run_evaluation(test_env, decision_maker)
-                    fold_profit = history_df['rewards'].sum()
-                    fold_results.append(fold_profit)
-                    print(f"Profit for Fold {fold + 1}: {fold_profit:.2f} EUR")
+                    # TODO change env from dqn to new env models
+                    # history_df = run_evaluation(test_env, decision_maker)
+                    # fold_profit = history_df['rewards'].sum()
+                    # fold_results.append(fold_profit)
+                    # print(f"Profit for Fold {fold + 1}: {fold_profit:.2f} EUR")
 
                 print("\n--- Cross-Validation Summary ---")
                 mean_profit = np.mean(fold_results)
@@ -203,26 +205,24 @@ if __name__ == '__main__':
             method = 'ppo'
             if args.mode == 'train':
                 print(f"\n--- Starting PPO RL Agent Training Mode ---")
-                train_env = BatteryTradingEnvMasking(
+                train_env = ExtendedBatteryEnv(
                     battery_capacity_mwh=10.0,
                     charge_discharge_rate_mw=5.0,
                     all_data=train_df,
-                    number_of_past_prices=5
                 )
                 train_ppo_agent(
                     env=train_env,
                     model_save_path='models/ppo_battery_trading_model',
-                    total_timesteps=3 * len(train_df),
+                    total_timesteps=100000,
                 )
                 exit()
 
             elif args.mode == 'run':
                 print(f"\n--- Starting PPO RL Agent Run Mode ---")
-                test_env = BatteryTradingEnvMasking(
+                test_env = ExtendedBatteryEnv(
                     battery_capacity_mwh=10.0,
                     charge_discharge_rate_mw=5.0,
                     all_data=test_df,
-                    number_of_past_prices=5
                 )
 
                 model_path = 'models/ppo_battery_trading_model.zip'
@@ -251,7 +251,8 @@ if __name__ == '__main__':
             buy_thresholds = np.arange(0, 51, 10)
             sell_thresholds = np.arange(100, 201, 20)
 
-            perform_grid_search(train_env, buy_thresholds, sell_thresholds)
+            # TODO change to new env models
+            # perform_grid_search(train_env, buy_thresholds, sell_thresholds)
             train_env.close()
             exit()
 

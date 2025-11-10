@@ -1,4 +1,4 @@
-from Simulation.suite_simple_trading.model import BatteryTradingEnv1, BaseBatteryEnv
+from Simulation.suite_simple_trading.model import BaseBatteryEnv
 
 
 def run_evaluation(env: BaseBatteryEnv, decision_maker) -> dict:
@@ -16,17 +16,18 @@ def run_evaluation(env: BaseBatteryEnv, decision_maker) -> dict:
 
     done = False
     # Simulate steps required for the history required by the state
-    if env.number_of_past_prices > 0:
-        for _ in range(env.number_of_past_prices):
-            action = env.get_idle_action()
-            obs, reward, terminated, truncated, info = env.step(action)
-            energy_charged_discharged = info.get('energy_charged_discharged', 0)
-
-            prices_history.append(obs[1])
-            soc_history.append(env.soc_mwh)  # Get current SoC from the env
-            action_history.append(action)
-            reward_history.append(reward)
-            energy_charged_discharged_history.append(energy_charged_discharged)
+    # TODO add number_of_past_prices to base env if needed again
+    # if env.number_of_past_prices > 0:
+    #     for _ in range(env.number_of_past_prices):
+    #         action = env.get_idle_action()
+    #         obs, reward, terminated, truncated, info = env.step(action)
+    #         energy_charged_discharged = info.get('energy_charged_discharged', 0)
+    #
+    #         prices_history.append(obs[1])
+    #         soc_history.append(env.soc_mwh)  # Get current SoC from the env
+    #         action_history.append(action)
+    #         reward_history.append(reward)
+    #         energy_charged_discharged_history.append(energy_charged_discharged)
 
     while not done:
         action = decision_maker.get_action(obs, env.current_step)

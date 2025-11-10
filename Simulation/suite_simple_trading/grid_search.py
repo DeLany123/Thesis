@@ -1,4 +1,4 @@
-from Simulation.suite_simple_trading.model import BatteryTradingEnv1, BaseBatteryEnv
+from Simulation.suite_simple_trading.model import BaseBatteryEnv
 import numpy as np
 
 from Simulation.suite_simple_trading.policy import QuarterlyTrendDecisionMaker
