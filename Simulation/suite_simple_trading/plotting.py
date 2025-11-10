@@ -1,4 +1,5 @@
 import os
+from typing import Dict, List
 
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -88,4 +89,81 @@ def plot_simulation_results_minute_by_minute(
     print(f"Saving plot to: {full_path}")
     plt.savefig(full_path, dpi=300)
 
-    plt.show()
+    try:
+        plt.show()
+    except Exception as e:
+        print(f"Unable to display plot interactively: {e}")
+
+
+def moving_average(data: np.ndarray, window_size: int) -> np.ndarray:
+    """
+    Calculates the moving average of a 1D array.
+
+    Args:
+        data: The input array of numbers.
+        window_size: The size of the sliding window for the average.
+
+    Returns:
+        A new array containing the smoothed data.
+    """
+    if window_size <= 0:
+        raise ValueError("window_size must be a positive integer.")
+    return np.convolve(data, np.ones(window_size), 'valid') / window_size
+
+
+def plot_episode_rewards(
+        results_dict: Dict[str, List[float]],
+        title: str = "Training Performance",
+        smoothing_window: int = 10,
+        x_axis_scale: int = 1
+):
+    """
+    Plots the rewards per episode from one or more training runs.
+
+    Args:
+        results_dict: A dictionary where keys are the names of the runs (e.g., "PPO - Daily")
+                      and values are lists of the total reward from each episode.
+        title: The title of the plot.
+        smoothing_window: The number of episodes to average over for a smoother line.
+                          Set to 1 for no smoothing.
+        x_axis_scale: A factor to scale the x-axis by (e.g., 1000 for "x10³").
+    """
+    plt.style.use('seaborn-v0_8-whitegrid')
+    fig, ax = plt.subplots(figsize=(12, 7))
+
+    for label, rewards in results_dict.items():
+        rewards_np = np.array(rewards)
+
+        # Apply smoothing
+        if smoothing_window > 1 and len(rewards_np) > smoothing_window:
+            smoothed_rewards = moving_average(rewards_np, smoothing_window)
+        else:
+            smoothed_rewards = rewards_np  # No smoothing if not enough data or window is 1
+
+        # The x-axis represents the episode number after smoothing
+        # We scale it for readability (e.g., from 10000 episodes to "10" on the axis)
+        episodes = np.arange(len(smoothed_rewards)) / x_axis_scale
+
+        ax.plot(episodes, smoothed_rewards, label=label)
+
+    # --- Formatting ---
+    ax.set_title(title, fontsize=16)
+
+    # Set x-axis label based on the scaling factor
+    if x_axis_scale == 1:
+        ax.set_xlabel("Training Episodes", fontsize=12)
+    else:
+        # Create a formatted string like "(×10³)"
+        exponent = int(np.log10(x_axis_scale))
+        x_label = f"Training Episodes (×10³)" if exponent == 3 else f"Training Episodes (×10^{exponent})"
+        ax.set_xlabel(x_label, fontsize=12)
+
+    ax.set_ylabel("Total Episode Reward (€)", fontsize=12)
+    ax.legend(fontsize=11)
+
+    # Set a tight layout and show the plot
+    plt.tight_layout()
+    try:
+        plt.show()
+    except Exception as e:
+        print(f"Unable to display plot interactively: {e}")

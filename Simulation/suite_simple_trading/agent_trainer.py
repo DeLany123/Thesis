@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 from sb3_contrib import MaskablePPO
+from sb3_contrib.common.maskable.policies import MaskableActorCriticPolicy
 from sb3_contrib.common.wrappers import ActionMasker
 from stable_baselines3 import DQN
 from .model import BaseBatteryEnv
@@ -67,7 +68,7 @@ def train_ppo_agent(
 
     # 3. Create the MaskablePPO agent
     print("Creating the MaskablePPO agent...")
-    model = MaskablePPO("MlpPolicy", env)
+    model = MaskablePPO(MaskableActorCriticPolicy, env)
     print("Agent created.")
 
     # 4. Train the agent

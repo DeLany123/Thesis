@@ -7,14 +7,15 @@ from sb3_contrib import MaskablePPO
 from sklearn.model_selection import TimeSeriesSplit
 from stable_baselines3 import DQN
 
+from Simulation.suite_simple_trading.data_splitting import split_data_for_episodic_rl
 from Simulation.suite_simple_trading.model_old import BatteryTradingEnv1, BatteryTradingEnv2
 from .agent_trainer import train_dqn_agent, train_ppo_agent
 from .grid_search import perform_grid_search
 from .pre_processing import clean_data
 from .simulation import run_evaluation
 from .model import ExtendedBatteryEnv
-from .policy import QuarterlyTrendDecisionMaker, RLAgentDecisionMaker
-from .plotting import plot_simulation_results_minute_by_minute
+from .policy import QuarterlyTrendDecisionMaker, RLAgentDecisionMaker, PPOAgentDecisionMaker
+from .plotting import plot_simulation_results_minute_by_minute, plot_episode_rewards
 
 TRAIN_TEST_SPLIT_FRACTION = 0.8
 
@@ -89,19 +90,17 @@ if __name__ == '__main__':
         print(f"Saving cleaned data to cache: {cleaned_data_cache_path}")
         cleaned_df.to_pickle(cleaned_data_cache_path)
 
+    DAYS_PER_EPISODE = 3  # We are training on weekly episodes
+    TEST_FRACTION = 0.2  # We want 20% of our days in the test set
+    BUFFER_DAYS = 3  # Ensure that n days are left between train and test episodes
+
     all_data = cleaned_df[['Datetime', 'Imbalance Price']]
-    # Calculate the initial, approximate split point (e.g., at 80%)
-    initial_split_index = int(len(all_data) * TRAIN_TEST_SPLIT_FRACTION)
-    final_split_index = initial_split_index
-
-    # Loop forward from the initial point until we find the start of a quarter
-    for i in range(initial_split_index, len(all_data)):
-        if all_data['Datetime'].iloc[i].minute % 15 == 0:
-            final_split_index = i
-            break
-
-    train_df = all_data.iloc[:final_split_index]
-    test_df = all_data.iloc[final_split_index:].reset_index()
+    # Splitting of the data
+    train_df, test_df = split_data_for_episodic_rl(
+        all_data=all_data,
+        days_per_episode=DAYS_PER_EPISODE,
+        buffer_days=BUFFER_DAYS
+    )
 
     train_env = BatteryTradingEnv1(
         battery_capacity_mwh=10.0,
@@ -209,6 +208,7 @@ if __name__ == '__main__':
                     battery_capacity_mwh=10.0,
                     charge_discharge_rate_mw=5.0,
                     all_data=train_df,
+                    days_per_episode=DAYS_PER_EPISODE
                 )
                 train_ppo_agent(
                     env=train_env,
@@ -223,12 +223,13 @@ if __name__ == '__main__':
                     battery_capacity_mwh=10.0,
                     charge_discharge_rate_mw=5.0,
                     all_data=test_df,
+                    days_per_episode=DAYS_PER_EPISODE
                 )
 
                 model_path = 'models/ppo_battery_trading_model.zip'
                 try:
                     rl_model = MaskablePPO.load(model_path)
-                    decision_maker = RLAgentDecisionMaker(rl_model)
+                    decision_maker = PPOAgentDecisionMaker(rl_model, test_env)
                 except FileNotFoundError:
                     print(f"Error: Trained PPO model not found at '{model_path}'.")
                     exit()
@@ -288,6 +289,11 @@ if __name__ == '__main__':
         start_minute_index,
         end_minute_index
     )
+
+    episodic_reward_runs = {
+        'PPO - Daily': history_df['episodic_rewards']
+    }
+    plot_episode_rewards(episodic_reward_runs, f'episode_rewards_1')
 
     print(f"Total Profit: {history_df['rewards'].sum():.2f} EUR")
     test_env.close()

@@ -6,7 +6,32 @@ from stable_baselines3 import DQN
 from stable_baselines3.common.base_class import BaseAlgorithm
 
 
-class QuarterlyTrendDecisionMaker:
+class DecisionMaker:
+    """
+    Abstract base class for decision makers.
+    All decision makers should inherit from this class and implement the required methods.
+    """
+
+    def get_action(self, observation: np.ndarray, current_step: int) -> int:
+        """
+        The main method called by the runner to get the next action.
+
+        Args:
+            observation: The current state observation from the environment.
+            current_step: The current time step in the simulation.
+
+        Returns:
+            The integer action to be taken.
+        """
+        raise NotImplementedError("This method should be overridden by subclasses.")
+
+    def reset(self):
+        """
+        Resets the internal state of the decision maker for a new episode.
+        """
+        raise NotImplementedError("This method should be overridden by subclasses.")
+
+class QuarterlyTrendDecisionMaker(DecisionMaker):
     """
     A decision maker that implements the quarterly trend-based heuristic policy.
     It waits for a signal within a quarter and then locks in the decision for the
@@ -98,21 +123,23 @@ class QuarterlyTrendDecisionMaker:
         return ACTION_IDLE
 
 
-class RLAgentDecisionMaker:
+class RLAgentDecisionMaker(DecisionMaker):
     """
     A wrapper class to make a trained Stable-Baselines3 agent compatible
     with the generic evaluation loop (run_evaluation).
     """
 
-    def __init__(self, model: BaseAlgorithm):
+    def __init__(self, model: BaseAlgorithm, env):
         """
         Initializes the decision maker with a pre-trained RL model.
 
         Args:
             model: The trained Stable-Baselines3 model object (e.g., loaded via DQN.load()).
+            env: The environment instance used during training (for action masking, if needed).
         """
         # Store the trained model internally
         self.model = model
+        self.env = env
 
     def get_action(self, observation: np.ndarray, current_step: int) -> int:
         """
@@ -141,14 +168,15 @@ class RLAgentDecisionMaker:
 
 
 # In policy.py or decision_maker.py
-class PPOAgentDecisionMaker:
+class PPOAgentDecisionMaker(DecisionMaker):
     """
     Wrapper for a trained Stable-Baselines3 agent.
     Now handles action masks passed via the info dictionary.
     """
 
-    def __init__(self, model):
+    def __init__(self, model, env):
         self.model = model
+        self.env = env
 
     def get_action(self, observation: np.ndarray, info: dict) -> int:
         """
@@ -158,14 +186,12 @@ class PPOAgentDecisionMaker:
             observation: The current state observation.
             info: The info dictionary from the environment, which may contain an 'action_mask'.
         """
-        # Get the action mask from the info dictionary provided by the env
-        action_mask = info.get('action_mask')
 
         # Pass the mask to the predict method
         action, _states = self.model.predict(
             observation,
             deterministic=True,
-            action_masks=action_mask  # This is the key change
+            action_masks=self.env.action_masks()
         )
         return int(action)
 

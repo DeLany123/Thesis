@@ -15,6 +15,7 @@ class BaseBatteryEnv(gym.Env):
             battery_capacity_mwh: float,
             charge_discharge_rate_mw: float,
             all_data: pd.DataFrame,
+            days_per_episode: int = 1,
     ):
         super().__init__()
 
@@ -25,6 +26,16 @@ class BaseBatteryEnv(gym.Env):
         self.prices = all_data['Imbalance Price'].to_numpy()
         self.time_interval = 1 / 60
         self.max_steps = len(self.prices)
+        self.days_per_episode = days_per_episode
+
+        # Pre-calculate the starting index of each day.
+        self.daily_start_indices = self.all_data.groupby(
+            self.all_data['Datetime'].dt.date
+        ).head(1).index.tolist()
+        # This counter now tracks which *day* we start the episode on.
+        self.start_day_counter = 0
+        # This will store the calculated end step for the current episode.
+        self.current_episode_end_step = 0
 
         # --- Fixed Action Space ---
         self.action_space = gym.spaces.Discrete(3)  # 0: Idle, 1: Charge, 2: Discharge
@@ -61,11 +72,27 @@ class BaseBatteryEnv(gym.Env):
     def reset(self, seed=None, options=None):
         """Resets the environment to its initial state."""
         super().reset(seed=seed)
-        self.current_step = 0
+        # Start at the beginning of a day
+        self.current_step = self.daily_start_indices[self.start_day_counter]
+
+        # Determine the end step for this multi-day episode.
+        end_day_index = self.start_day_counter + self.days_per_episode
+        # Calculate the end step based on the start of the next day or the end of the data
+        if end_day_index >= len(self.daily_start_indices):
+            self.current_episode_end_step = self.max_steps - 1
+        else:
+            self.current_episode_end_step = self.daily_start_indices[end_day_index] - 1
+
+        self.start_day_counter += self.days_per_episode
+
+        if self.start_day_counter >= len(self.daily_start_indices):
+            self.start_day_counter = 0
+
         self.soc_mwh = 0.0
         self.total_energy_traded_per_quarter = 0.0
         self.total_charged_in_quarter = 0.0
         self.total_discharged_in_quarter = 0.0
+
         return self._get_observation(), {}
 
     def step(self, action: int):
@@ -93,7 +120,7 @@ class BaseBatteryEnv(gym.Env):
             self.total_discharged_in_quarter += abs(actual_energy_traded)
 
         reward = self._calculate_delayed_reward()
-        terminated = self.current_step >= self.max_steps - 1
+        terminated = self.current_step >= self.current_episode_end_step
         obs = self._get_observation()
 
         self.current_step += 1
@@ -107,6 +134,10 @@ class BaseBatteryEnv(gym.Env):
         if self.soc_mwh >= self.battery_capacity_mwh - epsilon: mask[1] = 0
         if self.soc_mwh <= epsilon: mask[2] = 0
         return np.array(mask, dtype=np.int8)
+
+    def get_idle_action(self) -> int:
+        """Returns the action index for 'Idle'."""
+        return 0
 
 
 class BasicBatteryEnv(BaseBatteryEnv):
@@ -135,7 +166,7 @@ class BasicBatteryEnv(BaseBatteryEnv):
 class ExtendedBatteryEnv(BaseBatteryEnv):
     """
     An extended battery environment.
-    Observation space: [SoC, Current Price, Total Charged, Total Discharged]
+    Observation space: [SoC, Current Price, Total Charged in Quarter, Total Discharged in Quarter]
     """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
