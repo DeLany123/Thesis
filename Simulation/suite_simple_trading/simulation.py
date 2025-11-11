@@ -10,6 +10,8 @@ def run_evaluation(
     Runs a single evaluation and returns a detailed history of the simulation.
     """
     prices_history = []
+    total_charged_per_quarter_history = []
+    total_discharged_per_quarter_history = []
     soc_history = []
     action_history = []
     reward_history = []
@@ -20,6 +22,7 @@ def run_evaluation(
         print(f"Starting episode {episode_num + 1}/{number_of_episodes}")
         obs, info = env.reset()
         decision_maker.reset()
+        print(f"From {env.all_data.iloc[env.current_step]['Datetime']} to {env.all_data.iloc[env.current_episode_end_step]['Datetime']}")
 
 
         done = False
@@ -35,7 +38,9 @@ def run_evaluation(
             energy_charged_discharged = info.get('energy_charged_discharged', 0)
 
             prices_history.append(obs[1])
-            soc_history.append(env.soc_mwh)  # Get current SoC from the env
+            soc_history.append(env.soc_mwh)  # Get current SoC from the env or obs[0]
+            total_charged_per_quarter_history.append(obs[2])
+            total_discharged_per_quarter_history.append(obs[3])
             action_history.append(action)
             reward_history.append(reward)
             reward_per_episode += reward
@@ -44,10 +49,13 @@ def run_evaluation(
             done = terminated or truncated
 
         episodic_rewards.append(reward_per_episode)
+        print(f"Finished with total reward: {reward_per_episode:.2f}")
     # Return all collected data in a dictionary
     return {
         "prices": prices_history,
         "soc": soc_history,
+        "total_charged_per_quarter": total_charged_per_quarter_history,
+        "total_discharged_per_quarter": total_discharged_per_quarter_history,
         "actions": action_history,
         "rewards": reward_history,
         "energy_charged_discharged": energy_charged_discharged_history,

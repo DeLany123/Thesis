@@ -8,6 +8,7 @@ from stable_baselines3.common.callbacks import BaseCallback
 import numpy as np
 
 from .model import BaseBatteryEnv
+from .observation_wrappers import RobustScalingWrapper
 
 
 def train_dqn_agent(
@@ -72,7 +73,8 @@ def train_ppo_agent(
 
     # 3. Create the MaskablePPO agent
     print("Creating the MaskablePPO agent...")
-    model = MaskablePPO(MaskableActorCriticPolicy, env)
+    train_env_scaled = RobustScalingWrapper(env)
+    model = MaskablePPO(MaskableActorCriticPolicy, train_env_scaled)
     print("Agent created.")
 
     reward_callback = EpisodeRewardCallback(save_path=reward_save_path, verbose=1)

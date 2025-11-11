@@ -201,3 +201,55 @@ def plot_learning_curve(
     ax.legend()
     plt.tight_layout()
     plt.show()
+
+
+def plot_total_charged_discharged_in_quarter_per_price(
+        results: pd.DataFrame,
+        price_bins: int = 50
+):
+    """
+        Plots the mean energy charged/discharged for different final quarter price bins.
+
+        This shows the agent's average "bet size" at various price levels.
+
+        Args:
+            results: The evaluation results DataFrame. Must contain 'Datetime',
+                        'final_quarter_price', 'total_charged_per_quarter',
+                        and 'total_discharged_per_quarter' columns.
+            price_bins: The number of price buckets to create on the x-axis.
+    """
+    # Filter only end of quarter data
+    end_of_quarter_mask = results['Datetime'].dt.minute % 15 == 14
+    eoq_data = results[end_of_quarter_mask]
+
+    # 2. Isolate quarters where there was significant charging or discharging.
+    charge_quarters = eoq_data[eoq_data['total_charged_per_quarter'] > 0.01].copy()
+    discharge_quarters = eoq_data[eoq_data['total_discharged_per_quarter'] > 0.01].copy()
+
+    charge_quarters['price_bin'] = pd.cut(charge_quarters['prices'], bins=price_bins)
+    discharge_quarters['price_bin'] = pd.cut(discharge_quarters['prices'], bins=price_bins)
+
+    # 4. Group by the price bins and calculate the mean traded volume for each bin.
+    charge_means = charge_quarters.groupby('price_bin')['total_charged_per_quarter'].mean()
+    discharge_means = discharge_quarters.groupby('price_bin')['total_discharged_per_quarter'].mean()
+
+    # 5. Plot the results.
+    plt.style.use('seaborn-v0_8-whitegrid')
+    fig, ax = plt.subplots(2, 1, figsize=(14, 12), sharex=True)
+    fig.suptitle('Agent Trading Strategy: Mean Volume by Price', fontsize=18)
+
+    # Charging Plot
+    charge_means.plot(kind='bar', ax=ax[0], color='dodgerblue', width=0.8)
+    ax[0].set_title('Charging Behavior')
+    ax[0].set_ylabel('Mean Energy Charged (MWh)')
+    ax[0].tick_params(axis='x', rotation=45)
+
+    # Discharging Plot
+    discharge_means.plot(kind='bar', ax=ax[1], color='crimson', width=0.8)
+    ax[1].set_title('Discharging Behavior')
+    ax[1].set_ylabel('Mean Energy Discharged (MWh)')
+    ax[1].set_xlabel('Final Quarter Price (€)')
+    ax[1].tick_params(axis='x', rotation=90)  # Rotate for readability
+
+    plt.tight_layout(rect=(0.0, 0.03, 1.0, 0.95))
+    plt.show()

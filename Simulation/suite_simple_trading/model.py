@@ -124,7 +124,9 @@ class BaseBatteryEnv(gym.Env):
         obs = self._get_observation()
 
         self.current_step += 1
-        info = {'energy_charged_discharged': actual_energy_traded}
+        info = {
+            'energy_charged_discharged': actual_energy_traded,
+        }
         return obs, reward, terminated, False, info
 
     def action_masks(self) -> np.ndarray:

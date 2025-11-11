@@ -15,7 +15,8 @@ from .pre_processing import clean_data
 from .simulation import run_evaluation
 from .model import ExtendedBatteryEnv
 from .policy import QuarterlyTrendDecisionMaker, RLAgentDecisionMaker, PPOAgentDecisionMaker
-from .plotting import plot_simulation_results_minute_by_minute, plot_episode_rewards, plot_learning_curve
+from .plotting import plot_simulation_results_minute_by_minute, plot_episode_rewards, plot_learning_curve, \
+    plot_total_charged_discharged_in_quarter_per_price
 
 TRAIN_TEST_SPLIT_FRACTION = 0.8
 
@@ -217,7 +218,7 @@ if __name__ == '__main__':
                     env=train_env,
                     model_save_path='models/ppo_battery_trading_model',
                     reward_save_path=REWARD_SAVE_PATH,
-                    total_timesteps=50000,
+                    total_timesteps=200_000,
                 )
                 plot_learning_curve(
                     reward_file_path=REWARD_SAVE_PATH,
@@ -301,6 +302,11 @@ if __name__ == '__main__':
         f'simulation_results_{method}_1',
         start_minute_index,
         end_minute_index
+    )
+
+    plot_total_charged_discharged_in_quarter_per_price(
+        results=history_df,
+        price_bins=50
     )
 
     # episodic_reward_runs = {
