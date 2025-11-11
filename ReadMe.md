@@ -207,3 +207,50 @@ al snel duidelijk dat de resultaten niet veel slechter werden bij een veel klein
 
 10_000 stappen geeft met dit model hetzelfde restulaat als 1_000_000 stappen. Dit is een groot verschil in runtime.
 
+
+## 10/11
+### Train/Test Split en Episodische Training
+
+#### Aanleiding: De zwakte van een chronologische split
+Voorheen werd de data simpelweg chronologisch opgesplitst, waarbij de eerste 80% voor training en de laatste 20% voor 
+testing werd gebruikt. Het model werd enkel getest op de laatste maanden van de dataset. Dit zorgt voor leakage alsook een slecht beeld van het model. Als dit juist een goeie periode was, 
+wordt verschillende modellen trainen vergelijken moeilijker. 
+
+#### Nieuwe Aanpak: Gerandomiseerde Episodische Split
+Om dit probleem op te lossen, is de data-opdeling volledig herwerkt. De nieuwe aanpak werkt als volgt:
+1.  De volledige dataset wordt opgedeeld in "episodes". Een episode bestaat uit een zelf te kiezen aaneengesloten dagen.
+2.  Een bepaald percentage van deze volledige episodes wordt willekeurig geselecteerd verspreid over de *gehele dataset*.
+3.  Deze willekeurig gekozen episodes vormen samen de testset. Alle andere data wordt gebruikt als trainingset.
+4.  Om 'data leakage' te voorkomen, wordt er een buffer van enkele dagen rond elke test-episode vrijgehouden, die noch voor training, noch voor testing wordt gebruikt.
+
+Bij het gebruiken van nieuwe data moet je de oude verwijderen zodat het programma ziet dat er een nieuwe split moet gemaakt worden.
+#### Uitleg van de Nieuwe Parameters
+Deze nieuwe methode introduceert drie belangrijke hyperparameters die de structuur van de training en testing bepalen:
+
+*   `DAYS_PER_EPISODE`: Het aantal aaneengesloten dagen dat één episode vormt. Dit is een cruciale parameter die de "tijdshorizon" van de agent bepaalt.
+    *   **Waarom?** Een kortere episode (bv. 1 dag) leert de agent snelle, dagelijkse winst te maximaliseren, maar kan geen strategieën leren die over meerdere dagen lopen (bv. 's nachts opladen om de volgende ochtend te verkopen). Een langere episode (bv. 3 of 7 dagen) laat de agent toe om complexere, meerdaagse patronen en strategieën te ontdekken.
+
+*   `TEST_FRACTION`: Het percentage van de *totale hoeveelheid dagen* in de dataset dat gereserveerd moet worden voor de testset.
+    *   **Waarom?** Dit biedt een flexibele manier om de grootte van de testset te bepalen. Een waarde van `0.2` betekent dat 20% van alle dagen in de dataset wordt gebruikt voor de test-episodes, wat resulteert in een representatieve steekproef.
+
+*   `BUFFER_DAYS`: Het aantal dagen dat *voor en na* een geselecteerde test-episode wordt vrijgehouden en uitgesloten van de trainingset.
+    *   **Waarom?** Dit is essentieel om 'data leakage' te voorkomen. Zonder buffer zou de agent kunnen trainen op data van de dag direct voor een test-episode, en die kennis 'onthouden' om de volgende dag (in de test-episode) oneerlijk goed te presteren. De buffer zorgt voor een strikte scheiding tussen de kennis van de training- en testperiodes.
+
+#### Verwachte Voordelen
+Betere convergentie van agents, er zijn meer terminal states. Betere represenatie van de reward omdat er random periodes
+gestaafd worden.
+
+### Te onderzoeken
+* Wat is de invloed van een kleinere/grotere episodes.  
+* Wat is de invloed van een grotere/kleinere buffer.
+* Heeft het nut om grotere totaal aantal timesteps te gebruiken.
+
+### Heeft het nut om grotere totaal aantal timesteps te gebruiken.
+Ik denk nu van niet, aangezien de winst niet veel groter is als er een veel kleiner aantal timesteps gekozen wordt.  
+De agent kiest een heel makkelijke strategie, hij koopt als de prijs negatief gaat en verkoopt al heel snel als er een
+positieve prijs is.
+
+### Nodige verbetering
+De agent moet leren om risico te pakken, het zou mogelijk moeten zijn om op een positieve prijs te kopen maar later te
+verkopen aan een nog hogere prijs.
+![Agent Easy Policy](plots/example_only_charging_negative.png "Agent Easy Policy")

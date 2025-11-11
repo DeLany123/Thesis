@@ -1,7 +1,6 @@
 from Simulation.suite_simple_trading.model import BaseBatteryEnv
 from Simulation.suite_simple_trading.policy import DecisionMaker
 
-
 def run_evaluation(
         env: BaseBatteryEnv,
         decision_maker: DecisionMaker,

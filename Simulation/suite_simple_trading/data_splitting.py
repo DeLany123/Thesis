@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import pandas as pd
 from typing import Tuple
@@ -8,7 +10,7 @@ def split_data_for_episodic_rl(
         days_per_episode: int,
         test_fraction: float = 0.2,
         buffer_days: int = 7
-) -> Tuple[pd.DataFrame, pd.DataFrame]:
+) -> Tuple[pd.DataFrame, pd.DataFrame, int]:
     """
     Splits time-series data into training and testing sets for episodic RL
     based on a fractional target for the test set size.
@@ -113,4 +115,65 @@ def split_data_for_episodic_rl(
     print(f"Testing data length:  {len(test_df)} rows")
     print(f"Actual fraction of data in test set: {actual_test_fraction:.2%}")
 
-    return train_df, test_df
+    return train_df, test_df, n_test_episodes
+
+
+def get_or_create_train_test_split(
+        all_data: pd.DataFrame,
+        save_path: str,
+        days_per_episode: int,
+        test_fraction: float,
+        buffer_days: int
+) -> Tuple[pd.DataFrame, pd.DataFrame, int]:
+    """
+    Loads a train/test split from disk if it exists.
+    If not, it creates a new split and saves it for future use.
+
+    Args:
+        all_data: The complete DataFrame.
+        save_path: The directory to save/load the data from (e.g., "model/used_data").
+        days_per_episode: Number of days that constitute one episode.
+        test_fraction: The fraction of data to allocate to the test set.
+        buffer_days: Number of buffer days to place around test episodes.
+
+    Returns:
+        A tuple containing (train_df, test_df, number_of_test_episodes).
+    """
+    train_file_path = os.path.join(save_path, "train_data.pkl")
+    test_file_path = os.path.join(save_path, "test_data.pkl")
+
+    # Check if both data files already exist
+    if os.path.exists(train_file_path) and os.path.exists(test_file_path):
+        print(f"--- Loading existing train/test data from '{save_path}' ---")
+        train_df = pd.read_pickle(train_file_path)
+        test_df = pd.read_pickle(test_file_path)
+
+        # Count the number of unique days in the test dataframe
+        num_days_in_test = test_df['Datetime'].dt.date.nunique()
+        # Calculate the number of full episodes this corresponds to
+        number_of_episodes = num_days_in_test // days_per_episode
+        test_to_train_ratio = len(test_df) / len(train_df)
+
+
+        print(f"--- Data loaded successfully. Found {number_of_episodes} test episodes. ---")
+        print(f"Test Data Size / Train Data Size: {test_to_train_ratio:.2f}")
+    else:
+        print(f"--- No existing data found. Creating new train/test split. ---")
+
+        # Call the splitting function, which now returns the episode count
+        train_df, test_df, number_of_episodes = split_data_for_episodic_rl(
+            all_data=all_data,
+            days_per_episode=days_per_episode,
+            test_fraction=test_fraction,
+            buffer_days=buffer_days
+        )
+
+        # Ensure the target directory exists
+        os.makedirs(save_path, exist_ok=True)
+
+        # Save the newly created dataframes using pickle for efficiency
+        train_df.to_pickle(train_file_path)
+        test_df.to_pickle(test_file_path)
+        print(f"--- New data split saved to '{save_path}' ---")
+
+    return train_df, test_df, number_of_episodes

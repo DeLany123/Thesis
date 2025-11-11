@@ -95,19 +95,8 @@ def plot_simulation_results_minute_by_minute(
         print(f"Unable to display plot interactively: {e}")
 
 
+# (Include the moving_average function here)
 def moving_average(data: np.ndarray, window_size: int) -> np.ndarray:
-    """
-    Calculates the moving average of a 1D array.
-
-    Args:
-        data: The input array of numbers.
-        window_size: The size of the sliding window for the average.
-
-    Returns:
-        A new array containing the smoothed data.
-    """
-    if window_size <= 0:
-        raise ValueError("window_size must be a positive integer.")
     return np.convolve(data, np.ones(window_size), 'valid') / window_size
 
 
@@ -167,3 +156,48 @@ def plot_episode_rewards(
         plt.show()
     except Exception as e:
         print(f"Unable to display plot interactively: {e}")
+
+
+def plot_learning_curve(
+    reward_file_path: str,
+    title: str = "Training Performance",
+    days_per_episode: int = 1,
+    smoothing_window: int = 5
+):
+    """
+    Loads episode rewards from a file and plots a smoothed learning curve.
+
+    Args:
+        reward_file_path: Path to the .npz file containing the rewards.
+        title: The title for the plot.
+        days_per_episode: The number of days in each episode, for calculating daily average.
+        smoothing_window: The window size for the moving average.
+    """
+    # Load the data
+    try:
+        # reward file but .npz extension needs to be joined
+        full_reward_file_path = reward_file_path if reward_file_path.endswith('.npz') else reward_file_path + '.npz'
+        data = np.load(full_reward_file_path)
+        rewards = data['rewards']
+    except FileNotFoundError:
+        print(f"Error: Reward file not found at {reward_file_path}")
+        return
+
+    # Calculate the average daily reward per episode
+    avg_daily_reward = rewards / days_per_episode
+
+    # Smooth the curve
+    smoothed_rewards = moving_average(avg_daily_reward, smoothing_window)
+    episodes = np.arange(len(smoothed_rewards))
+
+    # Plotting
+    plt.style.use('seaborn-v0_8-whitegrid')
+    fig, ax = plt.subplots(figsize=(12, 7))
+    ax.plot(episodes, smoothed_rewards, label="Smoothed Reward", color="dodgerblue")
+
+    ax.set_title(title, fontsize=16)
+    ax.set_xlabel(f"Training Episodes (Smoothed over {smoothing_window} episodes)", fontsize=12)
+    ax.set_ylabel("Average Daily Reward (€)", fontsize=12)
+    ax.legend()
+    plt.tight_layout()
+    plt.show()

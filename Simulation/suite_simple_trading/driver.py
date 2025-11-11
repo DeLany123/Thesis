@@ -7,7 +7,7 @@ from sb3_contrib import MaskablePPO
 from sklearn.model_selection import TimeSeriesSplit
 from stable_baselines3 import DQN
 
-from Simulation.suite_simple_trading.data_splitting import split_data_for_episodic_rl
+from Simulation.suite_simple_trading.data_splitting import split_data_for_episodic_rl, get_or_create_train_test_split
 from Simulation.suite_simple_trading.model_old import BatteryTradingEnv1, BatteryTradingEnv2
 from .agent_trainer import train_dqn_agent, train_ppo_agent
 from .grid_search import perform_grid_search
@@ -15,7 +15,7 @@ from .pre_processing import clean_data
 from .simulation import run_evaluation
 from .model import ExtendedBatteryEnv
 from .policy import QuarterlyTrendDecisionMaker, RLAgentDecisionMaker, PPOAgentDecisionMaker
-from .plotting import plot_simulation_results_minute_by_minute, plot_episode_rewards
+from .plotting import plot_simulation_results_minute_by_minute, plot_episode_rewards, plot_learning_curve
 
 TRAIN_TEST_SPLIT_FRACTION = 0.8
 
@@ -90,15 +90,18 @@ if __name__ == '__main__':
         print(f"Saving cleaned data to cache: {cleaned_data_cache_path}")
         cleaned_df.to_pickle(cleaned_data_cache_path)
 
-    DAYS_PER_EPISODE = 3  # We are training on weekly episodes
-    TEST_FRACTION = 0.2  # We want 20% of our days in the test set
-    BUFFER_DAYS = 3  # Ensure that n days are left between train and test episodes
-
     all_data = cleaned_df[['Datetime', 'Imbalance Price']]
-    # Splitting of the data
-    train_df, test_df = split_data_for_episodic_rl(
+    DATA_SAVE_PATH = "models/used_data"
+    REWARD_SAVE_PATH = "models/ppo_battery_trading_rewards"
+    DAYS_PER_EPISODE = 3
+    TRAIN_TEST_SPLIT_FRACTION = 0.2
+    BUFFER_DAYS = 3
+
+    train_df, test_df, nr_of_episodes = get_or_create_train_test_split(
         all_data=all_data,
+        save_path=DATA_SAVE_PATH,
         days_per_episode=DAYS_PER_EPISODE,
+        test_fraction=TRAIN_TEST_SPLIT_FRACTION,
         buffer_days=BUFFER_DAYS
     )
 
@@ -213,7 +216,14 @@ if __name__ == '__main__':
                 train_ppo_agent(
                     env=train_env,
                     model_save_path='models/ppo_battery_trading_model',
-                    total_timesteps=100000,
+                    reward_save_path=REWARD_SAVE_PATH,
+                    total_timesteps=50000,
+                )
+                plot_learning_curve(
+                    reward_file_path=REWARD_SAVE_PATH,
+                    title=f"PPO Agent Learning Curve ({DAYS_PER_EPISODE}-Day Episodes)",
+                    days_per_episode=DAYS_PER_EPISODE,
+                    smoothing_window=5
                 )
                 exit()
 
@@ -257,7 +267,10 @@ if __name__ == '__main__':
             train_env.close()
             exit()
 
-    history_df = pd.DataFrame(run_evaluation(test_env, decision_maker))
+    result = run_evaluation(test_env, decision_maker, number_of_episodes=nr_of_episodes)
+    # remove episodic rewards from result for minute by minute plotting
+    episodic_rewards = result.pop('episodic_rewards')
+    history_df = pd.DataFrame(result)
     history_df['Datetime'] = test_df['Datetime']
 
     start_minute_index = history_df['Datetime'].searchsorted(history_df['Datetime'].iloc[0], side='left')
@@ -290,12 +303,13 @@ if __name__ == '__main__':
         end_minute_index
     )
 
-    episodic_reward_runs = {
-        'PPO - Daily': history_df['episodic_rewards']
-    }
-    plot_episode_rewards(episodic_reward_runs, f'episode_rewards_1')
+    # episodic_reward_runs = {
+    #     'PPO - Daily': episodic_rewards
+    # }
+    # plot_episode_rewards(episodic_reward_runs, f'episode_rewards_1')
 
     print(f"Total Profit: {history_df['rewards'].sum():.2f} EUR")
+
     test_env.close()
     train_env.close()
     print("\nScript finished.")
