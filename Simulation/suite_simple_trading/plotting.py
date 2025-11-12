@@ -138,7 +138,7 @@ def plot_episode_rewards(
     # --- Formatting ---
     ax.set_title(title, fontsize=16)
 
-    # Set x-axis label based on the scaling factor
+    # Set x-axis label based on the scaling_comparison factor
     if x_axis_scale == 1:
         ax.set_xlabel("Training Episodes", fontsize=12)
     else:
@@ -162,7 +162,8 @@ def plot_learning_curve(
     reward_file_path: str,
     title: str = "Training Performance",
     days_per_episode: int = 1,
-    smoothing_window: int = 5
+    smoothing_window: int = 5,
+    full_path: str = 'plots/learning_curve'
 ):
     """
     Loads episode rewards from a file and plots a smoothed learning curve.
@@ -172,6 +173,7 @@ def plot_learning_curve(
         title: The title for the plot.
         days_per_episode: The number of days in each episode, for calculating daily average.
         smoothing_window: The window size for the moving average.
+        :param full_path: name of path where the png will be stored.
     """
     # Load the data
     try:
@@ -200,12 +202,14 @@ def plot_learning_curve(
     ax.set_ylabel("Average Daily Reward (€)", fontsize=12)
     ax.legend()
     plt.tight_layout()
+    plt.savefig(full_path, dpi=300)
     plt.show()
 
 
 def plot_total_charged_discharged_in_quarter_per_price(
         results: pd.DataFrame,
-        price_bins: int = 50
+        price_bins: int = 50,
+        full_path: str = 'plots/charged_discharged_decisions'
 ):
     """
         Plots the mean energy charged/discharged for different final quarter price bins.
@@ -217,6 +221,7 @@ def plot_total_charged_discharged_in_quarter_per_price(
                         'final_quarter_price', 'total_charged_per_quarter',
                         and 'total_discharged_per_quarter' columns.
             price_bins: The number of price buckets to create on the x-axis.
+            :param full_path: name of path where png will be stored
     """
     # Filter only end of quarter data
     end_of_quarter_mask = results['Datetime'].dt.minute % 15 == 14
@@ -252,4 +257,5 @@ def plot_total_charged_discharged_in_quarter_per_price(
     ax[1].tick_params(axis='x', rotation=90)  # Rotate for readability
 
     plt.tight_layout(rect=(0.0, 0.03, 1.0, 0.95))
+    plt.savefig(full_path, dpi=300)
     plt.show()

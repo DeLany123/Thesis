@@ -73,6 +73,8 @@ def train_ppo_agent(
 
     # 3. Create the MaskablePPO agent
     print("Creating the MaskablePPO agent...")
+    # model = MaskablePPO(MaskableActorCriticPolicy, env)
+    # TODO make it an argument to use a scaler
     train_env_scaled = RobustScalingWrapper(env)
     model = MaskablePPO(MaskableActorCriticPolicy, train_env_scaled)
     print("Agent created.")

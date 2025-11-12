@@ -209,48 +209,126 @@ al snel duidelijk dat de resultaten niet veel slechter werden bij een veel klein
 
 
 ## 10/11
-### Train/Test Split en Episodische Training
 
-#### Aanleiding: De zwakte van een chronologische split
-Voorheen werd de data simpelweg chronologisch opgesplitst, waarbij de eerste 80% voor training en de laatste 20% voor 
-testing werd gebruikt. Het model werd enkel getest op de laatste maanden van de dataset. Dit zorgt voor leakage alsook een slecht beeld van het model. Als dit juist een goeie periode was, 
-wordt verschillende modellen trainen vergelijken moeilijker. 
+### Train/Test Split and Episodic Training
 
-#### Nieuwe Aanpak: Gerandomiseerde Episodische Split
-Om dit probleem op te lossen, is de data-opdeling volledig herwerkt. De nieuwe aanpak werkt als volgt:
-1.  De volledige dataset wordt opgedeeld in "episodes". Een episode bestaat uit een zelf te kiezen aaneengesloten dagen.
-2.  Een bepaald percentage van deze volledige episodes wordt willekeurig geselecteerd verspreid over de *gehele dataset*.
-3.  Deze willekeurig gekozen episodes vormen samen de testset. Alle andere data wordt gebruikt als trainingset.
-4.  Om 'data leakage' te voorkomen, wordt er een buffer van enkele dagen rond elke test-episode vrijgehouden, die noch voor training, noch voor testing wordt gebruikt.
+The data splitting methodology has been fundamentally reworked for more robust and reliable model evaluation.
 
-Bij het gebruiken van nieuwe data moet je de oude verwijderen zodat het programma ziet dat er een nieuwe split moet gemaakt worden.
-#### Uitleg van de Nieuwe Parameters
-Deze nieuwe methode introduceert drie belangrijke hyperparameters die de structuur van de training en testing bepalen:
+#### Problem: Weakness of Chronological Split
+The previous method used a simple 80/20 chronological split. This was flawed because the model was only tested on a specific, non-representative time period (e.g., the last months of the year). This made model comparisons unreliable and risked overfitting to the test period's specific market conditions.
 
-*   `DAYS_PER_EPISODE`: Het aantal aaneengesloten dagen dat één episode vormt. Dit is een cruciale parameter die de "tijdshorizon" van de agent bepaalt.
-    *   **Waarom?** Een kortere episode (bv. 1 dag) leert de agent snelle, dagelijkse winst te maximaliseren, maar kan geen strategieën leren die over meerdere dagen lopen (bv. 's nachts opladen om de volgende ochtend te verkopen). Een langere episode (bv. 3 of 7 dagen) laat de agent toe om complexere, meerdaagse patronen en strategieën te ontdekken.
+#### New Approach: Randomized Episodic Split
+1.  **Episodic Structure:** The dataset is now divided into "episodes," where each episode consists of a configurable number of consecutive days.
+2.  **Random Selection:** A fraction of these episodes are randomly selected from the *entire dataset* to form the test set. All other data is used for training.
+3.  **Buffer Zone:** To prevent data leakage, a buffer of several days is excluded around each test episode. This data is not used for training or testing.
 
-*   `TEST_FRACTION`: Het percentage van de *totale hoeveelheid dagen* in de dataset dat gereserveerd moet worden voor de testset.
-    *   **Waarom?** Dit biedt een flexibele manier om de grootte van de testset te bepalen. Een waarde van `0.2` betekent dat 20% van alle dagen in de dataset wordt gebruikt voor de test-episodes, wat resulteert in een representatieve steekproef.
+**Note:** To generate a new random split, the previously saved `train_data.pkl` and `test_data.pkl` files must be deleted.
 
-*   `BUFFER_DAYS`: Het aantal dagen dat *voor en na* een geselecteerde test-episode wordt vrijgehouden en uitgesloten van de trainingset.
-    *   **Waarom?** Dit is essentieel om 'data leakage' te voorkomen. Zonder buffer zou de agent kunnen trainen op data van de dag direct voor een test-episode, en die kennis 'onthouden' om de volgende dag (in de test-episode) oneerlijk goed te presteren. De buffer zorgt voor een strikte scheiding tussen de kennis van de training- en testperiodes.
+#### New Hyperparameters
 
-#### Verwachte Voordelen
-Betere convergentie van agents, er zijn meer terminal states. Betere represenatie van de reward omdat er random periodes
-gestaafd worden.
+*   `DAYS_PER_EPISODE`: The number of consecutive days in one episode. This defines the agent's time horizon. A longer episode allows the agent to learn more complex, multi-day strategies (e.g., charge on weekends, sell on weekdays).
 
-### Te onderzoeken
-* Wat is de invloed van een kleinere/grotere episodes.  
-* Wat is de invloed van een grotere/kleinere buffer.
-* Heeft het nut om grotere totaal aantal timesteps te gebruiken.
+*   `TEST_FRACTION`: The fraction of total days to allocate to the test set. A value of `0.2` creates a representative 20% test sample from the entire dataset.
 
-### Heeft het nut om grotere totaal aantal timesteps te gebruiken.
-Ik denk nu van niet, aangezien de winst niet veel groter is als er een veel kleiner aantal timesteps gekozen wordt.  
-De agent kiest een heel makkelijke strategie, hij koopt als de prijs negatief gaat en verkoopt al heel snel als er een
-positieve prijs is.
+*   `BUFFER_DAYS`: The number of days excluded before and after each test episode. This ensures a clean separation between train and test data, preventing the agent from using knowledge of the period immediately preceding a test episode.
 
-### Nodige verbetering
-De agent moet leren om risico te pakken, het zou mogelijk moeten zijn om op een positieve prijs te kopen maar later te
-verkopen aan een nog hogere prijs.
+#### Expected Benefits
+This new split leads to a more reliable evaluation. The agent is now tested on diverse periods throughout the year, forcing it to learn a more general and robust policy.
+
+### Further Research
+*   Impact of shorter vs. longer episodes.
+*   Impact of larger vs. smaller buffer sizes.
+*   Utility of training for more `total_timesteps`.
+
+### Analysis of `total_timesteps`
+Increasing `total_timesteps` currently shows little benefit. The agent quickly converges to a simple, local-optimum strategy: it buys at negative prices and sells immediately after for a small profit.
+
+### Needed Improvement
+The agent must learn to perform true price arbitrage (buy positive, sell higher). Currently, it avoids risk and only exploits the obvious negative price opportunities.
 ![Agent Easy Policy](plots/example_only_charging_negative.png "Agent Easy Policy")
+
+## 12/11
+
+### Scaling
+Created an observation wrapper for scaling in `observation_wrappers.py`
+
+**Problem:**
+Input features had unequal scales. The `Imbalance Price` (large range) dominated other features like `SoC` (small range). This disrupts the training of the neural network.
+
+**Solution:**
+- **Price-feature:** Scaled with Robust Scaling (median and IQR). This method is insensitive to extreme outliers.
+- **Other features (SoC, volume):** Scaled with Min-Max Scaling, because their bounds are fixed.
+
+**Goal:**
+More stable and efficient training of the agent.
+
+### Extra metrics
+
+#### Learning curve
+When training output the average reward per day per episode. 
+
+#### Decision graph
+Outputs The decisions taken at a certain price. Before we only looked at the total reward. But this is not a metric that
+tells the full story, for example the period could been a lucky one, but a lot of bad choices could have been made.
+
+### Scaling Results with the New Metrics
+
+To clearly illustrate the impact of feature scaling, the following sections compare the key performance metrics side-by-side. Each section focuses on a specific type of analysis, showing the result *without scaling* directly above the result *with scaling*.
+
+#### Trading Decisions Over Time
+
+This plot shows the agent's actions (charge/discharge/idle) over a sample period. It gives a direct visual sense of how active the agent is.
+
+**Without Scaling**
+In the graph below, we can see the decisions made per step. It is easy to see that the agent still takes minimal risk and does not leverage the battery on only positive prices. It also tries to sell the energy rather quickly and does not wait for a better price.
+![PPO decisions](plots/scaling_comparison/ppo_decisions_in_time_no_scaling.png "PPO decisions in time")
+
+**With Scaling**
+In comparison with the graph above for the same period, we can see that the agent decided to take a lot more actions.
+This can indicate that the agent is learning a more sophisticated policy. This is intuitive because now it likely pays more attention to the other features. The `price` feature probably had too great of an impact on the previous agent because it is some magnitudes bigger than the other features.
+![PPO decisions with scaling](plots/scaling_comparison/ppo_decisions_in_time_scaling.png "PPO decisions in time with scaling")
+
+---
+
+#### Trading Decisions by Price
+
+This plot shows the distribution of prices at which the agent chooses to charge or discharge.  
+
+**Without Scaling**
+The plot below tells us more about the prices at which the agent tries to buy. The observed behavior from the previous 
+analysis is also seen here. The charging is happening mostly on a positive price, although discharging does a more clear job of selling at higher prices. This might indicate that the agent is making mistakes and not taking into account that the price can change by the end of the quarter.
+![PPO Decisions per price](plots/scaling_comparison/ppo_decision_per_price_no_scaling.png "PPO decisions per price")
+
+**With Scaling**
+This is the graph with the least visible change. The tail of the charging graph is smoother and longer in the direction of
+the positive prices. This might indicate that the agent is trying to leverage more now.  
+![PPO Decisions per price with scaling](plots/scaling_comparison/ppo_decisions_per_price_scaling.png "PPO decisions per price with scaling")
+
+---
+
+#### Learning Curve (Reward per Episode)
+
+Finally, I have plotted my interpretation of a learning curve, although I am not certain if the methodology is correct. The rewards from each episode were collected during training via a callback, and a moving average of these rewards was then plotted.
+
+The resulting curve is very bumpy, which could suggest several areas for further investigation:
+* The model architecture may not be powerful enough. 
+* The training duration might be insufficient. 
+* The hyperparameters may not be properly fine-tuned.
+  
+Alternatively, the curve's volatility could be a direct result of the environment's stochastic nature, which would make a bumpy plot an expected outcome. Lastly, it is also possible that my method for generating the learning curve is not standard, and further research on this is required.  
+**Without Scaling**  
+![PPO Learning Curve No Scaling](plots/scaling_comparison/learning_curve_no_scaling_400k_steps.png "PPO Learning curve no scaling")
+
+**With Scaling** It does not look like a big improvement on the first sight, but you can actually see that the curve is much
+more smoothened out, has a better mean, and stays higher. The variance of the episodic rewards is smaller, resulting in 
+a smoother curve with less severe fluctuations. This indicates that the agent's performance is more consistent and the policy 
+is more robust. There is one really bad episode where the reward is very low, but even there, the valley is higher than in the no scaling one.
+![PPO Learning Curve Scaling](plots/scaling_comparison/learning_curve_scaling_400k_steps.png "PPO Learning curve scaling")
+
+---
+**Reward**  
+For a battery of 10kwh (a big at home battery) over a 2 months period, using the agent and having access to use the imbalance price:  
+**Without Scaling**  
+Would give a **90€ profit**.  
+**With Scaling**   
+128€ profit. Which is actually not bad (:

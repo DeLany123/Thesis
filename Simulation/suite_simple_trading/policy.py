@@ -178,13 +178,12 @@ class PPOAgentDecisionMaker(DecisionMaker):
         self.model = model
         self.env = env
 
-    def get_action(self, observation: np.ndarray, info: dict) -> int:
+    def get_action(self, observation: np.ndarray, _) -> int:
         """
         Predicts the best action, using an action mask if available.
 
         Args:
             observation: The current state observation.
-            info: The info dictionary from the environment, which may contain an 'action_mask'.
         """
 
         # Pass the mask to the predict method

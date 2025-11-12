@@ -9,6 +9,7 @@ from stable_baselines3 import DQN
 
 from Simulation.suite_simple_trading.data_splitting import split_data_for_episodic_rl, get_or_create_train_test_split
 from Simulation.suite_simple_trading.model_old import BatteryTradingEnv1, BatteryTradingEnv2
+from Simulation.suite_simple_trading.observation_wrappers import RobustScalingWrapper
 from .agent_trainer import train_dqn_agent, train_ppo_agent
 from .grid_search import perform_grid_search
 from .pre_processing import clean_data
@@ -214,11 +215,12 @@ if __name__ == '__main__':
                     all_data=train_df,
                     days_per_episode=DAYS_PER_EPISODE
                 )
+                # TODO, maybe make scaling_comparison an extra program parameter.
                 train_ppo_agent(
                     env=train_env,
                     model_save_path='models/ppo_battery_trading_model',
                     reward_save_path=REWARD_SAVE_PATH,
-                    total_timesteps=200_000,
+                    total_timesteps=400_000,
                 )
                 plot_learning_curve(
                     reward_file_path=REWARD_SAVE_PATH,
@@ -236,7 +238,6 @@ if __name__ == '__main__':
                     all_data=test_df,
                     days_per_episode=DAYS_PER_EPISODE
                 )
-
                 model_path = 'models/ppo_battery_trading_model.zip'
                 try:
                     rl_model = MaskablePPO.load(model_path)
@@ -268,7 +269,8 @@ if __name__ == '__main__':
             train_env.close()
             exit()
 
-    result = run_evaluation(test_env, decision_maker, number_of_episodes=nr_of_episodes)
+    test_env_scaled = RobustScalingWrapper(test_env)
+    result = run_evaluation(test_env_scaled, decision_maker, number_of_episodes=nr_of_episodes)
     # remove episodic rewards from result for minute by minute plotting
     episodic_rewards = result.pop('episodic_rewards')
     history_df = pd.DataFrame(result)

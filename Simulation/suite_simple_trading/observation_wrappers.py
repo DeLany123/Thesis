@@ -8,7 +8,7 @@ from Simulation.suite_simple_trading.model import BaseBatteryEnv
 
 class RobustScalingWrapper(gym.ObservationWrapper):
     """
-    A flexible observation scaling wrapper that supports different scaling methods.
+    A flexible observation scaling_comparison wrapper that supports different scaling_comparison methods.
     It is designed to be robust to outliers in the data.
     """
 
@@ -44,7 +44,7 @@ class RobustScalingWrapper(gym.ObservationWrapper):
             print(f"Price (Robust): Median={self.price_param1:.2f}, IQR={self.price_param2:.2f}")
 
         elif self.method == 'minmax_clipped':
-            # This method clips extreme outliers before scaling
+            # This method clips extreme outliers before scaling_comparison
             p01 = np.quantile(price_series, 0.01)
             p99 = np.quantile(price_series, 0.99)
             self.price_param1 = p01
@@ -61,16 +61,16 @@ class RobustScalingWrapper(gym.ObservationWrapper):
         print("--- Wrapper ready. ---")
 
     def observation(self, obs: np.ndarray) -> np.ndarray:
-        """Applies the chosen scaling method to the observation vector."""
+        """Applies the chosen scaling_comparison method to the observation vector."""
         # Assuming observation is [soc, price, total_charged, total_discharged]
         scaled_obs = np.copy(obs)
 
-        # --- Apply Min-Max scaling to features with fixed, known bounds ---
+        # --- Apply Min-Max scaling_comparison to features with fixed, known bounds ---
         scaled_obs[0] = (obs[0] - self.soc_min) / (self.soc_max - self.soc_min + 1e-8)
         scaled_obs[2] = (obs[2] - self.trade_min) / (self.trade_max - self.trade_min + 1e-8)
         scaled_obs[3] = (obs[3] - self.trade_min) / (self.trade_max - self.trade_min + 1e-8)
 
-        # --- Apply the chosen scaling method to the PRICE feature (index 1) ---
+        # --- Apply the chosen scaling_comparison method to the PRICE feature (index 1) ---
         price = obs[1]
         if self.method == 'standard':
             scaled_obs[1] = (price - self.price_param1) / self.price_param2
