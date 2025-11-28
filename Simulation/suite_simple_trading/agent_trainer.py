@@ -79,7 +79,7 @@ def train_ppo_agent(
     model = MaskablePPO(MaskableActorCriticPolicy, train_env_scaled)
     print("Agent created.")
 
-    reward_callback = EpisodeRewardCallback(save_path=reward_save_path, verbose=1)
+    reward_callback = EpisodeRewardCallback(verbose=1)
 
     # 4. Train the agent
     print(f"\n--- Starting PPO Training for {total_timesteps} Timesteps ---")
@@ -93,13 +93,12 @@ def train_ppo_agent(
 
 class EpisodeRewardCallback(BaseCallback):
     """
-    A custom callback to log the total reward of each episode and save them at the end of training.
+    A custom callback to log the total reward of each episode in memory.
+    The collected rewards can be accessed via the `episode_rewards` attribute.
     """
-
-    def __init__(self, save_path: str, verbose: int = 0):
+    def __init__(self, verbose: int = 0):
         super(EpisodeRewardCallback, self).__init__(verbose)
-        self.save_path = save_path
-        self.episode_rewards = []
+        self.episode_rewards = []  # List to store rewards
         self.episode_count = 0
 
     def _on_step(self) -> bool:
@@ -107,27 +106,13 @@ class EpisodeRewardCallback(BaseCallback):
         This method is called after each step in the environment.
         It checks if an episode has just finished and logs the reward.
         """
-        # In a non-vectorized env, `dones` is a boolean array of size 1.
-        # It's True when an episode has terminated.
+        # Check if an episode has just finished
         if self.locals['dones'][0]:
-            # The 'infos' dict contains the 'episode' key when an episode ends.
-            # 'r' is the total reward for that episode.
             episode_reward = self.locals['infos'][0]['episode']['r']
             self.episode_rewards.append(episode_reward)
             self.episode_count += 1
 
-            # Optional: Print progress every 10 episodes
             if self.verbose > 0 and self.episode_count % 10 == 0:
                 print(f"Episode {self.episode_count} finished. Total Reward: {episode_reward:.2f}")
 
         return True  # Must return True to continue training
-
-    def _on_training_end(self) -> None:
-        """
-        This method is called at the end of the training process.
-        It saves the collected episode rewards to a file.
-        """
-        print("\n--- Training finished. Saving episode rewards. ---")
-        # Save the rewards as a numpy archive.
-        np.savez(self.save_path, rewards=np.array(self.episode_rewards))
-        print(f"Episode rewards saved to: {self.save_path}")

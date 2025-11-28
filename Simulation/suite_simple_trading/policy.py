@@ -12,6 +12,9 @@ class DecisionMaker:
     All decision makers should inherit from this class and implement the required methods.
     """
 
+    def __init__(self, env):
+        self.env = env
+
     def get_action(self, observation: np.ndarray, current_step: int) -> int:
         """
         The main method called by the runner to get the next action.
@@ -31,6 +34,12 @@ class DecisionMaker:
         """
         raise NotImplementedError("This method should be overridden by subclasses.")
 
+    def step(self, action):
+        raise NotImplementedError("This method should be overridden by subclasses.")
+
+    def get_env(self):
+        return self.env
+
 class QuarterlyTrendDecisionMaker(DecisionMaker):
     """
     A decision maker that implements the quarterly trend-based heuristic policy.
@@ -38,7 +47,7 @@ class QuarterlyTrendDecisionMaker(DecisionMaker):
     remainder of that quarter.
     """
 
-    def __init__(self, theta_buy: float, theta_sell: float, past_prices_needed: int, date_times: np.ndarray):
+    def __init__(self, env, theta_buy: float, theta_sell: float, past_prices_needed: int, date_times: np.ndarray):
         """
         Initializes the decision maker with its specific parameters.
 
@@ -47,6 +56,7 @@ class QuarterlyTrendDecisionMaker(DecisionMaker):
             theta_sell: The price threshold for selling/discharging.
             past_prices_needed: The number of historical prices required for the trend analysis.
         """
+        super().__init__(env)
         self.theta_buy = theta_buy
         self.theta_sell = theta_sell
         self.past_prices_needed = past_prices_needed
@@ -137,9 +147,9 @@ class RLAgentDecisionMaker(DecisionMaker):
             model: The trained Stable-Baselines3 model object (e.g., loaded via DQN.load()).
             env: The environment instance used during training (for action masking, if needed).
         """
+        super().__init__(env)
         # Store the trained model internally
         self.model = model
-        self.env = env
 
     def get_action(self, observation: np.ndarray, current_step: int) -> int:
         """
@@ -175,8 +185,8 @@ class PPOAgentDecisionMaker(DecisionMaker):
     """
 
     def __init__(self, model, env):
+        super().__init__(env)
         self.model = model
-        self.env = env
 
     def get_action(self, observation: np.ndarray, _) -> int:
         """
@@ -195,4 +205,10 @@ class PPOAgentDecisionMaker(DecisionMaker):
         return int(action)
 
     def reset(self):
-        pass
+        return self.env.reset()
+
+    def step(self, action):
+        return self.env.step(action)
+
+    def get_env(self):
+        return self.env

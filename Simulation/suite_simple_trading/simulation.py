@@ -3,16 +3,24 @@ import gymnasium as gym
 from Simulation.suite_simple_trading.model import BaseBatteryEnv
 from Simulation.suite_simple_trading.policy import DecisionMaker
 
+import gymnasium as gym
+import pandas as pd
+from stable_baselines3.common.base_class import BaseAlgorithm
+
+# Import your custom environment class for type hinting
+from Simulation.suite_simple_trading.model import BaseBatteryEnv
+
 
 def run_evaluation(
         scaled_env: gym.Env,
-        decision_maker: DecisionMaker,
+        model: BaseAlgorithm,
         number_of_episodes: int = 1
 ) -> dict:
     """
-    Runs an evaluation using a (potentially wrapped) environment and returns a detailed history.
+    Runs an evaluation using a fully wrapped environment and a trained SB3 model.
     """
-    unwrapped_env = scaled_env.env
+    # Use the .unwrapped attribute to get the original BaseBatteryEnv for logging
+    unwrapped_env: BaseBatteryEnv = scaled_env.unwrapped
 
     # Initialize lists to store the history of UN-SCALED, human-readable data
     prices_history = []
@@ -20,22 +28,18 @@ def run_evaluation(
     total_charged_per_quarter_history = []
     total_discharged_per_quarter_history = []
     action_history = []
-    reward_history = []
+    scaled_reward_history = []
+    real_reward_history = []
     energy_charged_discharged_history = []
     episodic_rewards = []
 
     for episode_num in range(number_of_episodes):
         print(f"Starting episode {episode_num + 1}/{number_of_episodes}")
 
-        # --- INTERACT WITH THE WRAPPER ---
-        # Call .reset() on the scaled_env. It returns a SCALED observation.
+        # --- Interact with the SCALED environment ---
         obs, info = scaled_env.reset()
 
-        if hasattr(decision_maker, 'reset'):
-            decision_maker.reset()
-
-        # --- ACCESS STATE FROM THE UNWRAPPED ENV ---
-        # For logging, we use the original env to get the correct start/end times.
+        # --- Use the unwrapped environment for logging ---
         start_time = unwrapped_env.all_data.iloc[unwrapped_env.current_step]['Datetime']
         end_time = unwrapped_env.all_data.iloc[unwrapped_env.current_episode_end_step]['Datetime']
         print(f"From {start_time} to {end_time}")
@@ -43,27 +47,39 @@ def run_evaluation(
         done = False
         reward_per_episode = 0
         while not done:
-            action = decision_maker.get_action(obs, unwrapped_env.current_step)
+            # --- Get the action directly from the MODEL ---
+            # We get the action mask from the unwrapped env because wrappers hide custom methods
+            action_mask = unwrapped_env.action_masks()
 
+            # The model predicts based on the SCALED observation
+            action, _states = model.predict(
+                obs,
+                deterministic=True,  # Use deterministic mode for evaluation
+                action_masks=action_mask
+            )
+            action = int(action)
+
+            # --- Step the SCALED environment ---
             obs, reward, terminated, truncated, info = scaled_env.step(action)
 
+            # --- Log the UN-SCALED data from the unwrapped environment ---
             energy_charged_discharged = info.get('energy_charged_discharged', 0)
 
-            # Get the TRUE price, not the scaled one from obs[1]
             prices_history.append(unwrapped_env.prices[unwrapped_env.current_step - 1])
             soc_history.append(unwrapped_env.soc_mwh)
             total_charged_per_quarter_history.append(unwrapped_env.total_charged_in_quarter)
             total_discharged_per_quarter_history.append(unwrapped_env.total_discharged_in_quarter)
 
             action_history.append(action)
-            reward_history.append(reward)
+            scaled_reward_history.append(reward)
+            real_reward_history.append(info.get('real_reward', 0))
             reward_per_episode += reward
             energy_charged_discharged_history.append(energy_charged_discharged)
 
             done = terminated or truncated
 
         episodic_rewards.append(reward_per_episode)
-        print(f"Finished with total reward: {reward_per_episode:.2f}")
+        print(f"Finished with total (scaled) reward: {reward_per_episode:.2f}")
 
     return {
         "prices": prices_history,
@@ -71,7 +87,8 @@ def run_evaluation(
         "total_charged_per_quarter": total_charged_per_quarter_history,
         "total_discharged_per_quarter": total_discharged_per_quarter_history,
         "actions": action_history,
-        "rewards": reward_history,
+        "scaled_rewards": scaled_reward_history,
+        "real_rewards": real_reward_history,
         "energy_charged_discharged": energy_charged_discharged_history,
         "episodic_rewards": episodic_rewards
     }

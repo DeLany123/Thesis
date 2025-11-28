@@ -126,6 +126,7 @@ class BaseBatteryEnv(gym.Env):
         self.current_step += 1
         info = {
             'energy_charged_discharged': actual_energy_traded,
+            'real_reward': reward
         }
         return obs, reward, terminated, False, info
 
@@ -189,3 +190,4 @@ class ExtendedBatteryEnv(BaseBatteryEnv):
             self.total_charged_in_quarter,
             self.total_discharged_in_quarter
         ], dtype=np.float32)
+
