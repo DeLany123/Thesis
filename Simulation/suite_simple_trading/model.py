@@ -191,3 +191,95 @@ class ExtendedBatteryEnv(BaseBatteryEnv):
             self.total_discharged_in_quarter
         ], dtype=np.float32)
 
+
+class TimeAwareBatteryEnv(BaseBatteryEnv):
+    """
+    A new environment that extends the battery logic with time-aware features.
+
+    Observation Space (11 dimensions):
+    [0] SoC (State of Charge)
+    [1] Current Imbalance Price
+    [2] Total Charged in Quarter
+    [3] Total Discharged in Quarter
+    [4] Minute in Quarter (Normalized 0-1) - Represents urgency/progress to reward
+    [5] Hour Sine   (Cyclic)
+    [6] Hour Cosine (Cyclic)
+    [7] Week Sine   (Cyclic)
+    [8] Week Cosine (Cyclic)
+    [9] Month Sine  (Cyclic)
+    [10] Month Cosine (Cyclic)
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        # --- TIME FEATURE ENGINEERING ---
+        # We pre-calculate these for the entire dataset in __init__ for max performance.
+
+        dt_series = self.all_data['Datetime'].dt
+
+        # 1. Minute in Quarter (0-14) -> Normalized to [0, 1]
+        minutes = dt_series.minute
+        self.minute_in_quarter = (minutes % 15 / 14.0).to_numpy(dtype=np.float32)
+
+        # 2. Hours (0-23) -> Cyclic encoding
+        hours = dt_series.hour
+        self.h_sin = np.sin(2 * np.pi * hours / 23.0).to_numpy(dtype=np.float32)
+        self.h_cos = np.cos(2 * np.pi * hours / 23.0).to_numpy(dtype=np.float32)
+
+        # # 3. Weeks (1-53) -> Cyclic encoding
+        # weeks = dt_series.isocalendar().week
+        # self.w_sin = np.sin(2 * np.pi * weeks / 53.0).to_numpy(dtype=np.float32)
+        # self.w_cos = np.cos(2 * np.pi * weeks / 53.0).to_numpy(dtype=np.float32)
+        #
+        # # 4. Months (1-12) -> Cyclic encoding
+        # months = dt_series.month
+        # self.m_sin = np.sin(2 * np.pi * months / 12.0).to_numpy(dtype=np.float32)
+        # self.m_cos = np.cos(2 * np.pi * months / 12.0).to_numpy(dtype=np.float32)
+
+        # --- OBSERVATION SPACE DEFINITION ---
+        # 4 Base + 1 Minute + 6 Cyclic = 11 dimensions
+
+        # Bounds for: [SoC, Price, Charged, Discharged]
+        base_low = np.array([0.0, -np.inf, 0.0, 0.0], dtype=np.float32)
+        base_high = np.array([self.battery_capacity_mwh, np.inf, np.inf, np.inf], dtype=np.float32)
+
+        # Bounds for: [Minute in Quarter] (0 to 1)
+        minute_low = np.array([0.0], dtype=np.float32)
+        minute_high = np.array([1.0], dtype=np.float32)
+
+        # Bounds for: [h_sin, h_cos, w_sin, w_cos, m_sin, m_cos] (-1 to 1)
+        # cyclical_low = np.array([-1.0] * 6, dtype=np.float32)
+        # cyclical_high = np.array([1.0] * 6, dtype=np.float32)
+        cyclical_low = np.array([-1.0] * 2, dtype=np.float32)
+        cyclical_high = np.array([1.0] * 2, dtype=np.float32)
+
+        self.observation_space = gym.spaces.Box(
+            low=np.concatenate([base_low, minute_low, cyclical_low]),
+            high=np.concatenate([base_high, minute_high, cyclical_high]),
+            # shape=(11,),
+            shape=(7,),
+            dtype=np.float32
+        )
+
+    def _get_observation(self) -> np.ndarray:
+        """
+        Constructs the full observation array for the current step.
+        """
+        i = self.current_step
+
+        obs = np.array([
+            self.soc_mwh,
+            self.prices[i],
+            self.total_charged_in_quarter,
+            self.total_discharged_in_quarter,
+            self.minute_in_quarter[i],
+            self.h_sin[i],
+            self.h_cos[i],
+            # self.w_sin[i],
+            # self.w_cos[i],
+            # self.m_sin[i],
+            # self.m_cos[i]
+        ], dtype=np.float32)
+
+        return obs

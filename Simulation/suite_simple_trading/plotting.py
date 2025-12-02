@@ -5,6 +5,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import numpy as np
+import seaborn as sns
 
 
 def plot_simulation_results_minute_by_minute(
@@ -258,4 +259,71 @@ def plot_total_charged_discharged_in_quarter_per_price(
 
     plt.tight_layout(rect=(0.0, 0.03, 1.0, 0.95))
     plt.savefig(full_path, dpi=300)
+    plt.show()
+
+
+def plot_feature_importance(model, feature_names):
+    """
+    Extracts and plots the importance of features based on the weights
+    of the first layer of the network. Supports PPO and DQN.
+    """
+    # 1. Identify the algorithm and find the first layer
+    first_layer_weights = None
+
+    # CASE 1: PPO / MaskablePPO (Actor-Critic)
+    if hasattr(model.policy, "mlp_extractor"):
+        # We access the Actor's (policy_net) first layer
+        first_layer_weights = model.policy.mlp_extractor.policy_net[0].weight
+        print("Detected PPO/Actor-Critic architecture.")
+
+    # CASE 2: DQN (Q-Network)
+    elif hasattr(model.policy, "q_net"):
+        # We access the Q-Network's first layer
+        # In SB3 DQN, the MLP is stored in policy.q_net.q_net
+        first_layer_weights = model.policy.q_net.q_net[0].weight
+        print("Detected DQN architecture.")
+
+    else:
+        print("Error: Could not find the first layer weights for this model type.")
+        return
+
+    # 2. Convert to numpy
+    weights_np = first_layer_weights.detach().cpu().numpy()
+
+    # 3. Calculate importance
+    # Average absolute weight for each input feature
+    feature_importance = np.mean(np.abs(weights_np), axis=0)
+
+    # 4. Create the plot
+    plt.figure(figsize=(12, 6))
+    sns.barplot(x=feature_names, y=feature_importance, palette='viridis')
+    plt.title(f"Feature Importance ({model.__class__.__name__})")
+    plt.ylabel("Importance Score (Avg Abs Weight)")
+    plt.xlabel("Features")
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.show()
+
+def plot_volatility_vs_activity(result_data):
+    df = result_data.copy()
+    df['quarter_group'] = np.arange(len(df)) // 15
+
+    quarters = []
+    for _, group in df.groupby('quarter_group'):
+        if len(group) < 15: continue
+
+        # Calculate intra-quarter volatility
+        volatility = group['prices'].max() - group['prices'].min()
+
+        # Calculate total activity
+        final = group.iloc[-1]
+        activity = final['total_charged_per_quarter'] + final['total_discharged_per_quarter']
+
+        quarters.append({'Volatility (€ range)': volatility, 'Traded Volume (MWh)': activity})
+
+    plot_data = pd.DataFrame(quarters)
+
+    plt.figure(figsize=(10, 6))
+    sns.regplot(data=plot_data, x='Volatility (€ range)', y='Traded Volume (MWh)', scatter_kws={'alpha': 0.3})
+    plt.title("Agent Risk Profile: Does it trade more during chaos?")
     plt.show()

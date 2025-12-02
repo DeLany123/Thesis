@@ -14,6 +14,7 @@ from Simulation.suite_simple_trading.model import BaseBatteryEnv
 def run_evaluation(
         scaled_env: gym.Env,
         model: BaseAlgorithm,
+        is_masked: bool = True,
         number_of_episodes: int = 1
 ) -> dict:
     """
@@ -52,11 +53,14 @@ def run_evaluation(
             action_mask = unwrapped_env.action_masks()
 
             # The model predicts based on the SCALED observation
-            action, _states = model.predict(
-                obs,
-                deterministic=True,  # Use deterministic mode for evaluation
-                action_masks=action_mask
-            )
+            if is_masked:
+                action, _states = model.predict(
+                    obs,
+                    deterministic=True,  # Use deterministic mode for evaluation
+                    action_masks=action_mask
+                )
+            else:
+                action, _states = model.predict(obs)
             action = int(action)
 
             # --- Step the SCALED environment ---

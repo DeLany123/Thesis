@@ -18,7 +18,6 @@ class RobustScalingWrapper(gym.ObservationWrapper):
             method: Literal['standard', 'robust', 'minmax_clipped'] = 'robust'
     ):
         super().__init__(env)
-        self.all_data = env.all_data
         print(f"--- Initializing Robust Observation Scaling Wrapper (Method: {method}) ---")
 
         self.method = method
