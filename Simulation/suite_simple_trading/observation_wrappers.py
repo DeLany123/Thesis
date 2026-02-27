@@ -84,3 +84,118 @@ class RobustScalingWrapper(gym.ObservationWrapper):
         scaled_obs[[0, 2, 3]] = np.clip(scaled_obs[[0, 2, 3]], 0.0, 1.0)
 
         return scaled_obs.astype(np.float32)
+
+    def action_masks(self):
+        return self.env.action_masks()
+
+
+class SoCPenaltyWrapper(gym.Wrapper):
+    """
+    Adds a penalty if the battery is not fully charged, as described in the paper.
+    Formula: Penalty = weight * (SoC_max - SoC_current)
+
+    This encourages the agent to keep the battery charged to be ready for price peaks.
+    """
+    def __init__(self, env: gym.Env, weight: float = 0.1):
+        """
+        Args:
+            env: The environment to wrap.
+            weight: The 'omega' parameter from the paper.
+                    Controls the strength of the penalty.
+                    Start small (e.g., 0.01 or 0.1).
+        """
+        super().__init__(env)
+        self.weight = weight
+        # We need to access the max capacity from the base environment
+        # Assuming your BaseBatteryEnv has 'battery_capacity_mwh'
+        self.soc_max = self.env.unwrapped.battery_capacity_mwh
+
+    def step(self, action):
+        obs, reward, terminated, truncated, info = self.env.step(action)
+
+        # 1. Get the current SoC
+        # We access the unwrapped environment to get the true physical value
+        current_soc = self.env.unwrapped.soc_mwh
+
+        # 2. Calculate the Penalty (Equation 31)
+        # penalty is positive number representing the "cost"
+        penalty_value = self.weight * (self.soc_max - current_soc)
+
+        # 3. Subtract penalty from the reward
+        new_reward = reward - penalty_value
+
+        # 4. Optional: Log for debugging
+        info['soc_penalty'] = penalty_value
+        info['original_reward'] = reward
+
+        return obs, new_reward, terminated, truncated, info
+
+    def action_masks(self):
+        return self.env.action_masks()
+
+
+class FlexibleSoCPenaltyWrapper(gym.Wrapper):
+    """
+    Applies a penalty based on how much the battery is empty (Missing Charge).
+
+    The penalty is calculated based on the 'Deficit Ratio' (0.0 = Full, 1.0 = Empty).
+
+    Modes:
+    - 'linear': Penalty grows evenly. 50% empty = 0.5 * weight.
+    - 'quadratic': Penalty is low at start, high at end. 50% empty = 0.25 * weight.
+                   (Good for allowing small trades but preventing empty batteries).
+    - 'root': Penalty is high immediately. 50% empty = 0.71 * weight.
+              (Good for forcing the agent to keep it topped up strictly).
+    """
+
+    def __init__(
+            self,
+            env: gym.Env,
+            weight: float = 1.0,
+            mode: Literal['linear', 'quadratic', 'root'] = 'linear'
+    ):
+        super().__init__(env)
+        self.weight = weight
+        self.mode = mode
+
+        # Access max capacity to calculate ratios
+        self.soc_max = self.env.unwrapped.battery_capacity_mwh
+
+    def step(self, action):
+        obs, reward, terminated, truncated, info = self.env.step(action)
+
+        # 1. Calculate Deficit Ratio (0.0 = Full, 1.0 = Empty)
+        current_soc = self.env.unwrapped.soc_mwh
+        # Clip to ensure numerical stability (0 to 1)
+        deficit_ratio = np.clip((self.soc_max - current_soc) / self.soc_max, 0.0, 1.0)
+
+        # 2. Apply the Shape Function
+        if self.mode == 'linear':
+            # f(x) = x
+            shape_val = deficit_ratio
+
+        elif self.mode == 'quadratic':
+            # f(x) = x^2
+            # Penalizes 10% empty very little (0.01), but 100% empty fully (1.0).
+            shape_val = deficit_ratio ** 2
+
+        elif self.mode == 'root':
+            # f(x) = sqrt(x)
+            # Penalizes 10% empty heavily (0.31).
+            shape_val = np.sqrt(deficit_ratio)
+        else:
+            raise ValueError(f"Unknown mode: {self.mode}")
+
+        # 3. Calculate Final Penalty
+        penalty_value = self.weight * shape_val
+
+        # 4. Subtract from Reward
+        new_reward = reward - penalty_value
+
+        # Log for debugging
+        info['soc_penalty'] = penalty_value
+
+        return obs, new_reward, terminated, truncated, info
+
+    def action_masks(self):
+        return self.env.action_masks()

@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 
+from Simulation.suite_simple_trading.simulation import EvaluationResult
+
 
 def amount_of_good_quarters(result_data: pd.DataFrame) -> int:
     """
@@ -106,16 +108,103 @@ def bad_quarter_started_good(result_data: pd.DataFrame) -> int:
     return bad_luck_count
 
 
-def print_agent_performance(df: pd.DataFrame, agent_name: str = "Agent"):
+def mean_daily_reward(result_data: pd.DataFrame) -> float:
+    """
+    Calculates the average reward per 24-hour period (Day).
+    This includes idle time, making it a good metric for overall profitability.
+    """
+    total_reward = result_data['real_rewards'].sum()
+
+    # Assuming 1 row = 1 minute. 1 Day = 1440 minutes.
+    total_minutes = len(result_data)
+    total_days = total_minutes / 1440.0
+
+    if total_days == 0:
+        return 0.0
+
+    return float(total_reward / total_days)
+
+
+def profit_per_battery_cycle(result_data: pd.DataFrame, battery_capacity_mwh: float = 10.0) -> float:
+    """
+    Calculates the profit earned per complete battery cycle.
+
+    A battery cycle is defined as the equivalent of charging the battery from
+    empty to full capacity once. This metric helps evaluate profitability
+    relative to battery wear/degradation.
+
+    Args:
+        result_data: DataFrame containing simulation results with 'energy_charged_discharged' and 'real_rewards'
+        battery_capacity_mwh: Battery capacity in MWh (default: 10.0 MWh)
+
+    Returns:
+        float: Profit (€) per complete battery cycle. Returns 0.0 if no cycles occurred.
+
+    Note:
+        - Total cycles = Total energy throughput / (2 * battery_capacity)
+        - We divide by 2 because one cycle involves both charging AND discharging
+        - Alternatively: cycles = total_charged / battery_capacity
+    """
+    # Calculate total profit
+    total_profit = result_data['real_rewards'].sum()
+
+    # Calculate total energy charged (absolute value since energy_charged_discharged can be negative)
+    # Positive values = charging, Negative values = discharging
+    total_charged = result_data[result_data['energy_charged_discharged'] > 0]['energy_charged_discharged'].sum()
+
+    # Calculate number of complete cycles
+    # One cycle = charging the battery capacity once (then discharging it)
+    num_cycles = total_charged / battery_capacity_mwh
+
+    if num_cycles == 0:
+        return 0.0
+
+    return float(total_profit / num_cycles)
+
+
+def battery_cycle_count(result_data: pd.DataFrame, battery_capacity_mwh: float = 10.0) -> float:
+    """
+    Calculates the total number of complete battery cycles.
+
+    This is useful for understanding battery degradation and wear.
+
+    Args:
+        result_data: DataFrame containing simulation results with 'energy_charged_discharged'
+        battery_capacity_mwh: Battery capacity in MWh (default: 10.0 MWh)
+
+    Returns:
+        float: Number of complete battery cycles
+    """
+    # Calculate total energy charged
+    total_charged = result_data[result_data['energy_charged_discharged'] > 0]['energy_charged_discharged'].sum()
+
+    # Calculate number of complete cycles
+    num_cycles = total_charged / battery_capacity_mwh
+
+    return float(num_cycles)
+
+
+def print_agent_performance(df: pd.DataFrame, agent_name: str = "Agent", battery_capacity_mwh: float = 10.0):
     """
     Calculates and prints a formatted performance report using the defined metrics.
+
+    Args:
+        df: DataFrame containing simulation results
+        agent_name: Name of the agent for display
+        battery_capacity_mwh: Battery capacity in MWh (default: 10.0)
     """
+    # 0. Data Cleaning
+    df = df.copy()
+
     # 1. Calculate Metrics
     n_good = amount_of_good_quarters(df)
     n_bad = amount_of_bad_quarters(df)
     win_ratio = good_quarter_ratio(df)
     avg_reward = mean_reward_per_quarter(df)
     trap_quarters = bad_quarter_started_good(df)
+    avg_daily_reward = mean_daily_reward(df)
+    profit_per_cycle = profit_per_battery_cycle(df, battery_capacity_mwh)
+    total_cycles = battery_cycle_count(df, battery_capacity_mwh)
 
     # 2. Print Report
     print(f"========================================")
@@ -126,6 +215,10 @@ def print_agent_performance(df: pd.DataFrame, agent_name: str = "Agent"):
     print(f"----------------------------------------")
     print(f"  Success Rate (Active): {win_ratio:.2%}")
     print(f"  Mean Reward / active Quarter: €{avg_reward:.4f}")
+    print(f"  Mean Daily Reward    : €{avg_daily_reward:.4f}")
+    print(f"----------------------------------------")
+    print(f"  Battery Cycles       : {total_cycles:.2f}")
+    print(f"  Profit per Cycle     : €{profit_per_cycle:.2f}")
     print(f"----------------------------------------")
     print(f"  'Trap' Quarters      : {trap_quarters}")
     print(f"  (Started good -> Ended bad)")

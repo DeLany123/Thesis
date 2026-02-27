@@ -72,21 +72,24 @@ class BaseBatteryEnv(gym.Env):
     def reset(self, seed=None, options=None):
         """Resets the environment to its initial state."""
         super().reset(seed=seed)
+
+        # If the counter is at the end of the available days, wrap around to 0.
+        if self.start_day_counter >= len(self.daily_start_indices):
+            self.start_day_counter = 0
+
         # Start at the beginning of a day
         self.current_step = self.daily_start_indices[self.start_day_counter]
-
         # Determine the end step for this multi-day episode.
         end_day_index = self.start_day_counter + self.days_per_episode
+
         # Calculate the end step based on the start of the next day or the end of the data
         if end_day_index >= len(self.daily_start_indices):
             self.current_episode_end_step = self.max_steps - 1
         else:
             self.current_episode_end_step = self.daily_start_indices[end_day_index] - 1
 
+        # Advance the counter for the NEXT time reset() is called
         self.start_day_counter += self.days_per_episode
-
-        if self.start_day_counter >= len(self.daily_start_indices):
-            self.start_day_counter = 0
 
         self.soc_mwh = 0.0
         self.total_energy_traded_per_quarter = 0.0
@@ -120,7 +123,12 @@ class BaseBatteryEnv(gym.Env):
             self.total_discharged_in_quarter += abs(actual_energy_traded)
 
         reward = self._calculate_delayed_reward()
-        terminated = self.current_step >= self.current_episode_end_step
+
+        # Check if the episode is done
+        episode_done = self.current_step >= self.current_episode_end_step
+        # Check if we are at the end of the dataframe
+        data_done = self.current_step >= self.max_steps - 1
+        terminated = episode_done or data_done
         obs = self._get_observation()
 
         self.current_step += 1

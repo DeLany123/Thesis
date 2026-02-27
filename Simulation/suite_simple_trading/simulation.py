@@ -1,3 +1,6 @@
+from dataclasses import dataclass
+from typing import List
+
 import gymnasium as gym
 
 from Simulation.suite_simple_trading.model import BaseBatteryEnv
@@ -10,13 +13,42 @@ from stable_baselines3.common.base_class import BaseAlgorithm
 # Import your custom environment class for type hinting
 from Simulation.suite_simple_trading.model import BaseBatteryEnv
 
+@dataclass
+class EvaluationResult:
+    """
+    Structured output for simulation results.
+    Provides type hinting and autocompletion.
+    """
+    prices: List[float]
+    soc: List[float]
+    total_charged_per_quarter: List[float]
+    total_discharged_per_quarter: List[float]
+    actions: List[int]
+    scaled_rewards: List[float]
+    real_rewards: List[float]
+    energy_charged_discharged: List[float]
+    episodic_rewards: List[float]
+
+    def to_pandas(self):
+        """Helper to convert the core history to a DataFrame."""
+        import pandas as pd
+        return pd.DataFrame({
+            "prices": self.prices,
+            "soc": self.soc,
+            "total_charged_per_quarter": self.total_charged_per_quarter,
+            "total_discharged_per_quarter": self.total_discharged_per_quarter,
+            "actions": self.actions,
+            "scaled_rewards": self.scaled_rewards,
+            "real_rewards": self.real_rewards,
+            "energy_charged_discharged": self.energy_charged_discharged,
+        })
 
 def run_evaluation(
         scaled_env: gym.Env,
         model: BaseAlgorithm,
         is_masked: bool = True,
         number_of_episodes: int = 1
-) -> dict:
+) -> EvaluationResult:
     """
     Runs an evaluation using a fully wrapped environment and a trained SB3 model.
     """
@@ -61,7 +93,6 @@ def run_evaluation(
                 )
             else:
                 action, _states = model.predict(obs)
-            action = int(action)
 
             # --- Step the SCALED environment ---
             obs, reward, terminated, truncated, info = scaled_env.step(action)
@@ -85,17 +116,17 @@ def run_evaluation(
         episodic_rewards.append(reward_per_episode)
         print(f"Finished with total (scaled) reward: {reward_per_episode:.2f}")
 
-    return {
-        "prices": prices_history,
-        "soc": soc_history,
-        "total_charged_per_quarter": total_charged_per_quarter_history,
-        "total_discharged_per_quarter": total_discharged_per_quarter_history,
-        "actions": action_history,
-        "scaled_rewards": scaled_reward_history,
-        "real_rewards": real_reward_history,
-        "energy_charged_discharged": energy_charged_discharged_history,
-        "episodic_rewards": episodic_rewards
-    }
+    return EvaluationResult(
+        prices=prices_history,
+        soc=soc_history,
+        total_charged_per_quarter=total_charged_per_quarter_history,
+        total_discharged_per_quarter=total_discharged_per_quarter_history,
+        actions=action_history,
+        scaled_rewards=scaled_reward_history,
+        real_rewards=real_reward_history,
+        energy_charged_discharged=energy_charged_discharged_history,
+        episodic_rewards=episodic_rewards
+    )
 
 # NOTE: The run_paste_evaluations function should also be updated if you use it,
 def run_paste_evaluations(

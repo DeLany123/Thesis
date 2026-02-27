@@ -104,12 +104,12 @@ class DQN(nn.Module):
 
     def __init__(self, env):
         super(DQN, self).__init__()
-        self.layer1 = nn.Linear(len(env.reset()[0]), 128)
-        self.layer2 = nn.Linear(128, 128)
-        self.layer3 = nn.Linear(128, 128)
-        self.layer4 = nn.Linear(128, env.action_space.n)
-        with torch.no_grad():
-            self.layer4.bias.fill_(0)
+        self.layer1 = nn.Linear(len(env.reset()[0]), 64)
+        self.layer2 = nn.Linear(64, 64)
+        self.layer3 = nn.Linear(64, 64)
+        self.layer4 = nn.Linear(64, env.action_space.n)
+        # with torch.no_grad():
+        #     self.layer4.bias.fill_(0)
 
 
     # Called with either one element to determine next action, or a batch
@@ -119,6 +119,35 @@ class DQN(nn.Module):
         x = F.relu(self.layer2(x))
         x = F.relu(self.layer3(x))
         return self.layer4(x)
+
+
+
+class DQN(nn.Module):
+    def __init__(self, env):
+        super(DQN, self).__init__()
+        input_dim = len(env.reset()[0])
+        output_dim = env.action_space.n
+
+        self.layer1 = nn.Linear(input_dim, 64)
+        self.norm1 = nn.LayerNorm(64)
+
+        self.layer2 = nn.Linear(64, 64)
+        self.norm2 = nn.LayerNorm(64)
+
+        self.layer3 = nn.Linear(64, 64)
+        self.norm3 = nn.LayerNorm(64)
+
+        self.layer4 = nn.Linear(64, output_dim)
+
+
+    def forward(self, x):
+        # Smooth activations for continuous and noisy inputs
+        x = F.silu(self.norm1(self.layer1(x)))
+        x = F.silu(self.norm2(self.layer2(x)))
+        x = F.silu(self.norm3(self.layer3(x)))
+        q_values = self.layer4(x)
+
+        return q_values
 
 
 class MaskedDQN:
@@ -156,6 +185,7 @@ class MaskedDQN:
         self.evaluate_every = evaluate_every
         self.verbose = verbose
         self.dqn_model = dqn_model
+        self.number_of_samples = 1
 
         # Inner data
         self.replay_memory = ReplayMemory(self._replay_memory_size)
@@ -206,7 +236,8 @@ class MaskedDQN:
             state = next_state
 
             if t > 0 and t % self.train_every == 0:
-                self._optimize_model()
+                for _ in range(self.number_of_samples):
+                    self._optimize_model()
 
             self._soft_update(t)
 

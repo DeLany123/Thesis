@@ -29,9 +29,9 @@ def clean_data(data: pd.DataFrame) -> pd.DataFrame:
     # Check for nan values
     nan_rows = data[data['Imbalance Price'].isnull()]
     if len(nan_rows) > 0:
-        # Removing all rows in a quarter where a nan value is found
-        faulty_quarters = nan_rows["Datetime"].dt.floor('15T').unique()
-        full_data_quarters = data['Datetime'].dt.floor('15T')
+        faulty_quarters = nan_rows["Datetime"].dt.floor('15min').unique()
+        full_data_quarters = data['Datetime'].dt.floor('15min')
+
         keep_mask = ~full_data_quarters.isin(faulty_quarters)
         data = data[keep_mask]
     return data.reset_index(drop=True)

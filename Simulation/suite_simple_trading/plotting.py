@@ -7,88 +7,117 @@ import matplotlib.ticker as mticker
 import numpy as np
 import seaborn as sns
 
-
 def plot_simulation_results_minute_by_minute(
         results: pd.DataFrame,
         filename: str,
         start_minute: int = 0,
-        end_minute: int = 1440
+        end_minute: int = 1440,
+        battery_capacity_mwh: float = None  # Optional: Pass capacity for accurate %
 ):
     """
-    Plots minute-by-minute results with full date and time labels,
-    derived from the 'datetimes' key in the results.
+    Plots minute-by-minute results including Price, Energy Traded, and SoC %.
     """
     if end_minute is None:
         end_minute = len(results)
     plot_df = results.iloc[start_minute:end_minute].copy()
 
-    fig, ax1 = plt.subplots(figsize=(18, 7))
+    # --- Prepare SoC Data ---
+    # If capacity is not provided, estimate it from the max observed SoC
+    if battery_capacity_mwh is None:
+        battery_capacity_mwh = results['soc'].max()
+        if battery_capacity_mwh == 0: battery_capacity_mwh = 1.0  # Prevent div/0
 
-    color = 'tab:blue'
-    ax1.set_xlabel('Date and Time')
-    ax1.set_ylabel('Price (€/MWh)', color=color)
+    # Calculate SoC Percentage
+    soc_percentage = (plot_df['soc'] / battery_capacity_mwh) * 100
 
-    ax1.plot(plot_df.index, plot_df['prices'], color=color, linestyle='-', label='Price')
-    ax1.tick_params(axis='y', labelcolor=color)
-    ax1.grid(True, linestyle='--', alpha=0.6)
+    # --- Setup Plot ---
+    fig, ax1 = plt.subplots(figsize=(18, 8))  # Slightly taller for 3 axes
 
+    # --- AXIS 1: Price (Line) ---
+    color_price = 'tab:blue'
+    ax1.set_xlabel('Date and Time', fontsize=12)
+    ax1.set_ylabel('Price (€/MWh)', color=color_price, fontsize=12)
+    ax1.plot(plot_df.index, plot_df['prices'], color=color_price, linestyle='-', linewidth=2, label='Price', zorder=10)
+    ax1.tick_params(axis='y', labelcolor=color_price)
+    ax1.grid(True, linestyle='--', alpha=0.5)
+
+    # --- AXIS 2: Energy Traded (Bars) ---
     ax2 = ax1.twinx()
-    ax2.set_ylabel('Energy (MWh per minute)', color='black')
-    width = 0.8
-    colors = np.where(plot_df['energy_charged_discharged'] >= 0, 'green', 'red')
-    ax2.bar(plot_df.index, plot_df['energy_charged_discharged'], width=width, color=colors, alpha=0.7)
-    ax2.tick_params(axis='y', labelcolor='black')
-    ax2.axhline(0, color='black', linewidth=0.5)
+    ax2.set_ylabel('Energy Traded (MWh)', color='black', fontsize=12)
 
-    # Get the current limits of both axes
+    # Define colors: Green for Charge (+), Red for Discharge (-)
+    colors = np.where(plot_df['energy_charged_discharged'] >= 0, 'forestgreen', 'firebrick')
+    ax2.bar(plot_df.index, plot_df['energy_charged_discharged'], width=0.6, color=colors, alpha=0.9,
+            label='Energy Traded', zorder=5)
+    ax2.tick_params(axis='y', labelcolor='black')
+
+    # --- AXIS 3: SoC % (Background Bars/Area) ---
+    ax3 = ax1.twinx()
+
+    # Offset the third axis spine to the right so it doesn't overlap with ax2
+    ax3.spines["right"].set_position(("axes", 1.08))
+
+    color_soc = 'gold'
+    ax3.set_ylabel('State of Charge (%)', color='goldenrod', fontsize=12)
+
+    # Plot SoC as wide, semi-transparent bars in the background
+    ax3.bar(plot_df.index, soc_percentage, width=1.0, color=color_soc, alpha=0.5, label='SoC %', zorder=1)
+    ax3.set_ylim(0, 100)  # SoC is always 0-100%
+    ax3.tick_params(axis='y', labelcolor='goldenrod')
+
+    # --- Formatting Limits (Symmetric Price/Energy) ---
+    # We only symmetrize Price and Energy Traded, SoC stays 0-100
     ax1_min, ax1_max = ax1.get_ylim()
     ax2_min, ax2_max = ax2.get_ylim()
 
-    # Calculate the largest absolute value for each axis
     ax1_abs_max = max(abs(ax1_min), abs(ax1_max))
     ax2_abs_max = max(abs(ax2_min), abs(ax2_max))
 
-    # Set the new symmetric limits with 10% padding
+    # Apply padding
     ax1.set_ylim(-ax1_abs_max * 1.1, ax1_abs_max * 1.1)
     ax2.set_ylim(-ax2_abs_max * 1.1, ax2_abs_max * 1.1)
 
+    # Draw zero line for energy/price
+    ax2.axhline(0, color='black', linewidth=0.8, zorder=6)
+
+    # --- Date Formatting (Your existing logic) ---
     all_datetimes = pd.to_datetime(results['Datetime'])
 
     def format_full_datetime_ticks(tick_value, pos):
         if 0 <= tick_value < len(all_datetimes):
-            current_datetime = all_datetimes[int(tick_value)]
-            return current_datetime.strftime('%d-%m-%Y %H:%M')
+            return all_datetimes[int(tick_value)].strftime('%d-%m %H:%M')
         return ""
 
-    # Format string on given every 60 minutes on x-axis
     plot_duration_minutes = end_minute - start_minute
+    if plot_duration_minutes <= 180:
+        locator_interval = 15
+    elif plot_duration_minutes <= 1440:
+        locator_interval = 120
+    elif plot_duration_minutes <= 10080:
+        locator_interval = 1440
+    else:
+        locator_interval = 10080
 
-    # Choose a sensible interval for the x-axis ticks
-    if plot_duration_minutes <= 180:  # Up to 3 hours
-        locator_interval = 15  # A tick every 15 minutes
-    elif plot_duration_minutes <= 24 * 60:  # Up to 1 day
-        locator_interval = 120  # A tick every 2 hours
-    elif plot_duration_minutes <= 7 * 24 * 60:  # Up to 1 week
-        locator_interval = 24 * 60  # A tick every day
-    else:  # For longer periods
-        locator_interval = 7 * 24 * 60  # A tick every week
-
-    # Apply the formatter and the new dynamic locator
     ax1.xaxis.set_major_formatter(mticker.FuncFormatter(format_full_datetime_ticks))
     ax1.xaxis.set_major_locator(mticker.MultipleLocator(base=locator_interval))
 
-    plt.title(f'Minute-by-Minute Simulation Results')
+    # Title and Layout
+    plt.title(f'Simulation Analysis: Price, Trading Action, and SoC', fontsize=14)
     fig.autofmt_xdate(rotation=30, ha='right')
-    plt.tight_layout()
 
-    # Define the directory and filename for the plot
+    # Legend (Combining handles from different axes)
+    # lines, labels = ax1.get_legend_handles_labels()
+    # bars2, labels2 = ax2.get_legend_handles_labels()
+    # bars3, labels3 = ax3.get_legend_handles_labels()
+    # ax1.legend(lines + bars2 + bars3, labels + labels2 + labels3, loc='upper left')
+
+    # Saving
     plots_dir = 'plots'
     full_path = os.path.join(plots_dir, filename)
     os.makedirs(plots_dir, exist_ok=True)
 
-    # Save the figure
     print(f"Saving plot to: {full_path}")
-    plt.savefig(full_path, dpi=300)
+    plt.savefig(full_path, dpi=300, bbox_inches='tight')  # bbox_inches='tight' prevents cutting off the 3rd axis
 
     try:
         plt.show()
