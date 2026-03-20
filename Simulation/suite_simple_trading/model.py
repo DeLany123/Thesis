@@ -16,6 +16,7 @@ class BaseBatteryEnv(gym.Env):
             charge_discharge_rate_mw: float,
             all_data: pd.DataFrame,
             days_per_episode: int = 1,
+            cycle_cost_eur: float = 6.25
     ):
         super().__init__()
 
@@ -27,6 +28,10 @@ class BaseBatteryEnv(gym.Env):
         self.time_interval = 1 / 60
         self.max_steps = len(self.prices)
         self.days_per_episode = days_per_episode
+        self.cycle_cost_eur = cycle_cost_eur
+
+        throughput_per_cycle = 2 * self.battery_capacity_mwh
+        self.marginal_cost_per_mwh = self.cycle_cost_eur / throughput_per_cycle
 
         # Pre-calculate the starting index of each day.
         self.daily_start_indices = self.all_data.groupby(
@@ -66,7 +71,14 @@ class BaseBatteryEnv(gym.Env):
     def _calculate_delayed_reward(self) -> float:
         """Calculates reward at the end of each 15-minute interval."""
         if self.all_data['Datetime'].iloc[self.current_step].minute % 15 == 14:
-            return -self.prices[self.current_step] * self.total_energy_traded_per_quarter
+            revenue = -self.prices[self.current_step] * self.total_energy_traded_per_quarter
+
+            # Degradation Cost
+            throughput = self.total_charged_in_quarter + self.total_discharged_in_quarter
+            degradation_cost = throughput * self.marginal_cost_per_mwh
+
+            return revenue - degradation_cost
+
         return 0.0
 
     def reset(self, seed=None, options=None):
