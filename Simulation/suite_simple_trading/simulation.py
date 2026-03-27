@@ -2,12 +2,6 @@ from dataclasses import dataclass
 from typing import List
 
 import gymnasium as gym
-
-from Simulation.suite_simple_trading.model import BaseBatteryEnv
-from Simulation.suite_simple_trading.policy import DecisionMaker
-
-import gymnasium as gym
-import pandas as pd
 from stable_baselines3.common.base_class import BaseAlgorithm
 
 # Import your custom environment class for type hinting
