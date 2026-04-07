@@ -21,15 +21,7 @@ if __name__ == '__main__':
     raw_data_path = '../../data/2025_minute.csv'
     cleaned_data_cache_path = '../../data/2025_minute_cleaned.pkl'
 
-    if os.path.exists(cleaned_data_cache_path):
-        print(f"Loading cached cleaned data from: {cleaned_data_cache_path}")
-        cleaned_df = pd.read_pickle(cleaned_data_cache_path)
-    else:
-        print("No cached data found. Running the full cleaning process...")
-        raw_df = pd.read_csv(raw_data_path, sep=';')
-        cleaned_df = clean_data(raw_df)
-        print(f"Saving cleaned data to cache: {cleaned_data_cache_path}")
-        cleaned_df.to_pickle(cleaned_data_cache_path)
+    cleaned_df = clean_data(raw_path=raw_data_path, cache_path=cleaned_data_cache_path)
 
     all_data = cleaned_df[['Datetime', 'Imbalance Price']]
     train_df, test_df, nr_of_episodes = get_or_create_train_test_split(
