@@ -117,18 +117,32 @@ def clean_data(
     logger.info("Data starts on a quarter-hour boundary (%02d:%02d).",
                 data.iloc[0]["Datetime"].hour, start_minute)
 
-    # ── 5. Drop quarters that contain any NaN in 'Imbalance Price' ──────
+    # ── 5. Resample to continuous 1-minute intervals and handle NaNs ────
+    data = data.set_index("Datetime").resample("1min").asfreq().reset_index()
+    logger.info("Resampled to strict 1-minute intervals. Generated NaNs for missing minutes.")
+
     quarter_id = data["Datetime"].dt.floor("15min")
+
+    # We want to fill small gaps (e.g., missing a few minutes).
+    # If a whole quarter (15 straight minutes) is missing, forward-filling
+    # 15 minutes of prices might be too inaccurate, so we'll drop those quarters instead.
+
+    # First, let's forward-fill *within* limit (e.g. up to 10 missing minutes)
+    # Applied to all columns so no other variables leak NaNs into the environment
+    data = data.ffill(limit=10)
+
+    # Any NaNs remaining mean there was a gap longer than 10 minutes.
+    # Drop the entire 15-min quarter for any remaining NaNs
     nan_mask = data["Imbalance Price"].isna()
     n_nan = nan_mask.sum()
 
-    if n_nan:
+    if n_nan > 0:
         faulty_quarters = quarter_id[nan_mask].unique()
         keep_mask = ~quarter_id.isin(faulty_quarters)
         data = data[keep_mask]
         logger.warning(
-            "Found %d NaN value(s) in 'Imbalance Price' across %d quarter(s) "
-            "— removed %d row(s).",
+            "Found %d unfillable NaN value(s) in 'Imbalance Price' across %d quarter(s) "
+            "— dropped %d row(s).",
             n_nan, len(faulty_quarters), (~keep_mask).sum(),
         )
 
@@ -161,3 +175,46 @@ def clean_data(
         logger.info("Saved cleaned data to cache: %s", cache_path)
 
     return data
+
+if __name__ == "__main__":
+    # Temporary main function to test if there are any incomplete quarters
+    import warnings
+    warnings.filterwarnings("ignore")
+
+    # Using the relative path to the root data folder
+    test_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "data/raw_elia_data.csv"))
+
+    if os.path.exists(test_path):
+        print(f"Cleaning data from {test_path}...")
+
+        # Test original reading for raw incomplete quarters comparison
+        raw_data = pd.read_csv(test_path, sep=";")
+        raw_data["Datetime"] = pd.to_datetime(raw_data["Datetime"], utc=True)
+        raw_counts = raw_data.groupby(pd.Grouper(key="Datetime", freq="15min")).size()
+        raw_inc = raw_counts[raw_counts < 15]
+        print(f"\n--- BEFORE CLEANING ---")
+        print(f"Total quarters: {len(raw_counts)}")
+        print(f"Incomplete quarters: {len(raw_inc)}")
+        if len(raw_inc) > 0:
+            print("Row counts in incomplete quarters:")
+            print(raw_inc.value_counts().sort_index())
+
+        # Test after cleaning
+        cleaned_data = clean_data(data=raw_data.copy(), cache_path=None)
+
+        # Group by 15-minute intervals and count the number of 1-minute rows
+        quarterly_counts = cleaned_data.groupby(pd.Grouper(key="Datetime", freq="15min")).size()
+
+        # Filter for quarters with less than 15 minutes
+        incomplete_quarters = quarterly_counts[quarterly_counts < 15]
+
+        print(f"\n--- AFTER CLEANING ---")
+        print(f"Total quarters: {len(quarterly_counts)}")
+        print(f"Incomplete quarters: {len(incomplete_quarters)}")
+        if len(incomplete_quarters) > 0:
+            print("Row counts in incomplete quarters:")
+            print(incomplete_quarters.value_counts().sort_index())
+        else:
+            print("Row counts in incomplete quarters: 0 (All quarters contain exactly 15 minutes!)")
+    else:
+        print(f"Could not find test data at {test_path}")
