@@ -2,9 +2,6 @@
 HPC Benchmark Script — Train & Evaluate a Single Agent Across K Folds
 ======================================================================
 
-Designed to be submitted as a job on a High Performance Computing cluster.
-Each fold is trained and evaluated in its own thread for parallelism.
-
 Usage examples::
 
     python benchmark_agent.py --agent PPO --steps 500000
@@ -22,14 +19,16 @@ Arguments:
     --battery-cap   : Battery capacity in MWh (default: 10.0)
     --charge-rate   : Charge/discharge rate in MW (default: 5.0)
     --cycle-cost    : Cycle degradation cost in EUR (default: 6.25)
+    --sequential    : Running the folds sequentially instead of in parallel (useful for debugging or limited resources)
 """
 
 import argparse
 import os
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import List, Tuple, Dict, Any
+import torch
 
 import gymnasium as gym
 import numpy as np
@@ -293,7 +292,7 @@ class EvaluationResult:
 
 
 # ═══════════════════════════════════════════════════════════════════════
-#  EVALUATION LOOP  (fill in your own implementation)
+#  EVALUATION LOOP
 # ═══════════════════════════════════════════════════════════════════════
 def run_evaluation(
         scaled_env: gym.Env,
@@ -440,6 +439,26 @@ def _run_fold(
 
     Returns a dict with aggregated statistics for this fold.
     """
+
+    target_threads = int(os.environ.get('OMP_NUM_THREADS', 6))
+    torch.set_num_threads(target_threads)
+
+    pid = os.getpid()
+    torch_threads = torch.get_num_threads()
+
+    try:
+        # What cores is this process allowed to use?
+        allowed_cores = sorted(list(os.sched_getaffinity(0)))
+        # What specific core is it running on right this second?
+        current_core_start = os.sched_getcpu()
+
+        print(f"👀 [OBSERVE START] Fold {fold_idx} | PID: {pid} | "
+              f"PyTorch Threads: {torch_threads} | "
+              f"Currently on Core: {current_core_start} | "
+              f"Allowed Pool: {allowed_cores}")
+    except AttributeError:
+        print(f"👀 [OBSERVE START] Fold {fold_idx} | PID: {pid} | (Not on Linux, cannot observe cores)")
+
     val_df_combined = pd.concat(val_episodes, ignore_index=True)
 
     raw_revenues: List[float] = []
@@ -529,6 +548,10 @@ def main():
         default=os.path.join(os.path.dirname(__file__), "results"),
         help="Directory to write result CSVs.",
     )
+    parser.add_argument(
+        "--sequential", action="store_true",
+        help="If set, runs folds one by one instead of in parallel."
+    )
     parser.add_argument("--k-folds", type=int, default=5)
     parser.add_argument("--days-per-ep", type=int, default=4)
     parser.add_argument("--battery-cap", type=float, default=10.0)
@@ -544,17 +567,18 @@ def main():
     print(f"Loading {args.k_folds} folds from '{args.folds_path}' …")
     folds = load_folds(args.folds_path, args.k_folds)
 
-    # ── Launch one thread per fold ────────────────────────────────────
+    mode_str = "SEQUENTIALLY" if args.sequential else f"PARALLEL ({args.k_folds} workers)"
     print(f"\nBenchmarking {args.agent} | {args.steps:,} steps | "
-          f"{args.iterations} iterations/fold | {args.k_folds} folds (parallel)\n")
+          f"{args.iterations} iterations/fold | {args.k_folds} folds | Mode: {mode_str}\n")
 
     fold_results: List[Dict[str, Any]] = [None] * args.k_folds
 
-    with ThreadPoolExecutor(max_workers=args.k_folds) as pool:
-        future_to_fold = {}
+    global_start_time = time.time()
+
+    if args.sequential:
+        # ── RUN SEQUENTIALLY (Standard For-Loop) ──
         for fold_idx, (train_df, val_eps, test_eps) in enumerate(folds):
-            future = pool.submit(
-                _run_fold,
+            fold_results[fold_idx] = _run_fold(
                 fold_idx=fold_idx,
                 train_df=train_df,
                 val_episodes=val_eps,
@@ -568,15 +592,38 @@ def main():
                 charge_rate=args.charge_rate,
                 cycle_cost=args.cycle_cost,
             )
-            future_to_fold[future] = fold_idx
+    else:
+        # ── RUN IN PARALLEL (ProcessPoolExecutor) ──
+        with ProcessPoolExecutor(max_workers=args.k_folds) as pool:
+            future_to_fold = {}
+            for fold_idx, (train_df, val_eps, test_eps) in enumerate(folds):
+                future = pool.submit(
+                    _run_fold,
+                    fold_idx=fold_idx,
+                    train_df=train_df,
+                    val_episodes=val_eps,
+                    agent_class=agent_class,
+                    policy_name=policy_name,
+                    is_continuous=is_continuous,
+                    total_steps=args.steps,
+                    n_iterations=args.iterations,
+                    days_per_episode=args.days_per_ep,
+                    battery_capacity=args.battery_cap,
+                    charge_rate=args.charge_rate,
+                    cycle_cost=args.cycle_cost,
+                )
+                future_to_fold[future] = fold_idx
 
-        for future in as_completed(future_to_fold):
-            idx = future_to_fold[future]
-            try:
-                fold_results[idx] = future.result()
-            except Exception as exc:
-                print(f"  *** Fold {idx} raised an exception: {exc}")
-                raise
+            for future in as_completed(future_to_fold):
+                idx = future_to_fold[future]
+                try:
+                    fold_results[idx] = future.result()
+                except Exception as exc:
+                    print(f"  *** Fold {idx} raised an exception: {exc}")
+                    raise
+
+        # --- END GLOBAL TIMER ---
+    total_execution_time = time.time() - global_start_time
 
     # ── Aggregate & save ──────────────────────────────────────────────
     rows = []
