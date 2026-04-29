@@ -321,4 +321,4 @@ def debug_first_episode():
     print(f"Difference (DP - Env): €{dp_reward - total_env_reward:.2f}\n")
 
 if __name__ == "__main__":
-    debug_first_episode()
+    main()

@@ -1,0 +1,43 @@
+\chapter{Introduction}
+\label{chap:intro}
+
+\section{Problem Formulation and relevance}
+
+Talk about the new mindset on renewables, and that BESS is getting more and more interesting medium. 
+https://www.sciencedirect.com/science/article/pii/S0306261922008340
+This papers intro talks about renewables and its importantance, and also the laws that require it.
+"Among all the energy storage technologies, battery technologies, 
+especially the Li-ion battery, have experienced considerable cost 
+reduction in the last years. Therefore, the application of Battery Energy 
+Storage Systems (BESS) becomes a more attractive solution in electrical 
+power systems"
+
+Businesses often purchase their expected electricity needs on the day-ahead market. However, their actual consumption on the day of delivery can differ from what was planned. This difference, or \textit{imbalance}, must be settled on the imbalance market.  
+The prices in the imbalance market are significantly higher compared to the day-ahead market. Furthermore, the price is only decided at the end of a quarter, so the price for the electricity used in the past quarter will only be calculated based on the amount used during the entire quarter, multiplied by the price of the last minute of the quarter . Every minute, a forecast of the final price of the current quarter can be obtained, but this is not necessarily a good one.
+
+To mitigate the financial risks associated with price volatility, businesses can integrate a Battery Energy Storage System (BESS) into their energy management strategy. A BESS allows a business to perform energy arbitrage by charging during periods when imbalance prices are low—or ideally negative—and discharging that energy when prices are high. This enables the business to optimize its net imbalance position for each 15-minute settlement period, substituting expensive grid intake with energy acquired at a lower cost.
+
+The challenge is to develop an intelligent control policy for such a battery that minimizes the cost of electricity. We will discover a range of different families of techniques that can be tried for this problem.
+
+\section{Related work}
+Acknowledgement of simularity Karimi Madahi et al but more fundamental explained, for example data split, start state configuration choices should be easier for a starter to read, and also reuse.
+We couldve for example chosen to use already the best one there. But because methods chosen were vague, different starting point. The abality to fill in missing information were needed gave me the decision to dive deeper in very familiar research.
+
+\section{Outline of This thesis}
+
+Table~\ref{tab:resallocschemes} shows an overview of..
+
+\begin{table}[h]
+	\centering
+	\captionsetup{justification=centering}
+	\caption[Overzicht resource-allocatieschema's]{Overzicht resource-allocatieschema's}
+	\label{tab:resallocschemes}
+	\resizebox{\textwidth}{!}{%
+	\begin{tabular}{L{4cm} l C{2cm} c c c c}
+		\toprule
+		Naam & Jaar & Type  & A | F | P  & Invoer & Uitvoer & Getest  \\ \midrule
+		Alicherry et al.~\cite{Alicherry2012} & 2012 & k-sneden & A & G & par\{G\} & S \\
+		MCRVMP~\cite{Biran2012} & 2012 & ILP \& GH & A & B\{netwerk\} & VM-plaatsing & C\\
+		\bottomrule
+	\end{tabular}}
+\end{table}

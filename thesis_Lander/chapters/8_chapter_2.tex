@@ -1,0 +1,178 @@
+\chapter{The Belgian Electricity Market}
+\label{chap:market}
+
+
+This chapter introduces the institutional, regulatory, and operational context in which the Battery Energy Storage System (BESS) studied in this thesis operates. We begin by establishing the legal framework that governs Elia's activities: the European Union legislation that shapes electricity markets across all member states, the ENTSO-E Network Codes that standardise balancing rules at the continental level, and the Belgian federal and regional legislation that defines Elia's monopoly mandate at the transmission level. Against this regulatory backdrop, we then provide an overview of the layered structure of the Belgian electricity market, from long-term forward contracts down to real-time imbalance settlement. Finally, we examine in detail the real-time signals Elia publishes: MIP, MDP, SI, and NRV that directly drive the imbalance price observed by market participants. Although this thesis focuses primarily on the imbalance market, situating it within the broader market and regulatory architecture is essential for understanding its systemic importance and for identifying opportunities that may be explored in future work.
+
+% Info from https://www.elia.be/nl/bedrijf/wettelijk-kader
+Elia's mandate and operational rules are embedded within a European regulatory framework. The primary legal foundation consists of the Electricity Regulation, which is directly binding on all member states, and the Electricity Directive, which member states are required to transpose into national and regional law \cite{Regulation2019943, Directive2019944}. These instruments are complemented by the Risk Preparedness Regulation, describing cross-border coordination during electricity supply crises \cite{Regulation2019941}, and the ACER Regulation, which establishes the Agency for the Cooperation of Energy Regulators (ACER) as the supranational oversight body for European energy markets. The collective objectives of this legislative framework are to deepen cross-border trade and market integration, accommodate the increasing penetration of variable renewable generation, and promote market-driven investment aligned with EU decarbonization targets.
+
+At the operational level, Elia is further bound by the European Network Codes—a set of directly applicable technical regulations coordinated by the European Network of Transmission System Operators for Electricity (ENTSO-E) and originally mandated by Regulation~(EC) No~714/2009 \cite{Regulation2009714}. These codes are organised into four families: connection codes, operations codes, market codes, and cybersecurity codes. The market codes in particular standardise balancing and imbalance settlement rules across all member states, and it is within this harmonised supranational framework that the quarter-hour settlement mechanism and the single-price imbalance settlement rule described in Section~\ref{sec:balancing-market} and Section~\ref{sec:alpha-pricing} are ultimately grounded.
+
+% Info from https://www.elia.be/en/company/legal-framework
+Within Belgium, energy competence is divided between the federal government and the three regions. At the federal level, Elia holds a legal monopoly as transmission system operator, covering voltage levels from 70\,kV to 380\,kV under a licence that is renewable every 20 years governing federal legislation is the amended Electricity Act of 29 April 1999, together with the Federal Grid Code established by Royal Decree of 22 April 2019, which specifies the technical rules for network access and operation. Regulatory oversight at the federal level is exercised by the Commission for Electricity and Gas Regulation (CREG), which has been authorised since 1 September 2022 to issue a code of conduct covering the conditions for connection and access to the transmission network, ancillary-service provision, and cross-border capacity allocation.
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Structure of the Belgian Electricity Market}
+% ─────────────────────────────────────────────────────────────────────────────
+
+The Belgian electricity market operates under a multi-layered architecture in which different time horizons are served by different market mechanisms. Figure~\ref{fig:market-timeline} illustrates the chronological sequence of markets from years ahead of delivery down to real-time operation.
+
+\begin{figure}[h]
+    \centering
+    % Placeholder: a horizontal timeline showing Forward → Day-Ahead → Intraday → Balancing
+    \fbox{\parbox{0.95\textwidth}{\centering\vspace{1.5cm}
+    \textit{[TODO: Insert timeline figure of market layers: Forward market $\rightarrow$ Day-ahead (D-1) $\rightarrow$ Intraday $\rightarrow$ Balancing/Imbalance (real-time)]}
+    \vspace{1.5cm}}}
+    \caption{Chronological sequence of Belgian electricity market layers from long-term to real-time.}
+    \label{fig:market-timeline}
+\end{figure}
+
+\subsection{Forward and Futures Markets}
+
+Two related instruments operate in the long-term segment of the market. \textit{Futures} are standardised contracts traded on power exchanges such as the ICE Endex and the European Energy Exchange (EEX); their standardisation permits secondary trading on organised markets. \textit{Forwards}, by contrast, are bilateral over-the-counter (OTC) agreements that offer greater flexibility in contractual terms but are not standardised and are therefore rarely re-traded \cite{[search: electricity forward futures OTC bilateral contract standardised exchange ICE EEX]}. Both instruments allow electricity generators to lock in a future sale price—reducing their exposure to downward price movements—and allow large consumers to secure future supply at known costs, a risk-management practice known as \textit{hedging}. These contracts are financially settled and do not directly affect the physical dispatch of generation assets, but they set the economic context in which day-ahead and intraday positions are taken.
+
+In addition to forwards and futures, two further instruments have gained prominence in the long-term segment, driven by the accelerating deployment of renewable generation. Although both share the goal of providing price stability over multi-year horizons, they differ fundamentally in how they achieve it.
+
+A \textit{Power Purchase Agreement} (PPA) is a direct bilateral supply contract between a generator and an energy buyer---typically a large industrial consumer, a utility, or a corporate off-taker. The parties negotiate a fixed price per MWh and a volume; the generator then sells electricity to the buyer at that agreed price, irrespective of prevailing spot market conditions. Because the contractually agreed price is itself the settlement price, the spot market is bypassed entirely for the contracted volume. PPAs typically extend ten to fifteen years, providing generators with revenue certainty sufficient to finance new renewable projects and offering buyers a predictable long-term supply cost \cite{[search: Eurelectric power purchase agreement PPA renewable energy long-term contract bilateral]}.
+
+A \textit{Contract for Difference} (CfD) operates differently: the generator continues to sell electricity on the spot market at the prevailing price, and the CfD functions as a \textit{separate financial overlay} settled alongside that market participation. A pre-agreed \textit{strike price} is set between the generator and a counterparty---which, crucially, need not be an energy buyer at all; in the case of publicly supported projects it is typically the State. If the spot price exceeds the strike price, the generator pays the counterparty the difference; if the spot price falls below the strike price, the counterparty compensates the generator. This two-way structure---also called a symmetrical market premium---prevents windfall profits during price spikes while guaranteeing a minimum return during downturns, thereby reducing investment risk without removing the generator from the spot market. The 2024 EU electricity market reform, motivated by the 2022 energy crisis during which fossil-fuel price spikes propagated to consumers via the merit-order principle even when renewable generation was abundant, made two-way CfDs mandatory for all publicly supported investments in new renewable and low-carbon nuclear capacity \cite{[search: EU electricity market reform 2024 CfD mandatory renewable nuclear Council Regulation 2024]}.
+
+\subsection{Day-Ahead Market}
+
+The day-ahead market (DAM) is the primary venue for physical electricity trading. Unlike bilateral over-the-counter (OTC) transactions, the exchange-organised DAM pools liquidity from all participants, ensures anonymity, and produces a single transparent reference price. In Belgium, the DAM is operated by EPEX SPOT as a blind auction—participants submit orders without visibility of competing bids—with the order book closing at 12:00 CET for delivery during all 24 hours of the following day. Two types of orders are admitted: hourly orders, specifying willingness to buy or sell at each price level for a given delivery period, and block orders, which link several consecutive delivery periods into a single indivisible bid. A market-clearing algorithm then finds the intersection of the resulting aggregate supply and demand curves to determine the Market Clearing Price (MCP) and matched volumes for every hour. The Belgian DAM participates in the Single Day-Ahead Coupling (SDAC), the pan-European day-ahead market coupling scheme mandated by the CACM Network Code and now encompassing 27 countries \cite{Regulation2019943_Consolidated2024}. SDAC is operated jointly by Nominated Electricity Market Operators (NEMOs)---the power exchanges, of which EPEX SPOT is Belgium's---and the participating TSOs, coordinated through the Price Coupling of Regions (PCR) consortium. The clearing computation itself is executed by the EUPHEMIA algorithm (Pan-European Hybrid Electricity Market Integration Algorithm), developed by PCR and progressively deployed across Europe since 2014 \cite{[search: EUPHEMIA Price Coupling Regions algorithm day-ahead welfare maximisation PCR 2014]}: EUPHEMIA simultaneously matches buy and sell orders and allocates cross-zonal transmission capacities so as to maximise aggregate social welfare across the coupled region, subject to operational security constraints, replacing the earlier patchwork of national algorithms that each optimised only locally. Once trades are concluded on the exchange, they are cleared and settled by the European Commodity Clearing (ECC) house, which acts as central counterparty to both buyer and seller, thereby eliminating counterparty credit risk on exchange transactions \cite{[search: ECC European Commodity Clearing central counterparty electricity spot market settlement]}.
+
+The day-ahead price therefore represents the consensus view of the market, formed approximately 12 to 36 hours before physical delivery. The DAM closes when the market zone reaches balance: scheduled generation in the zone must equal forecasted demand plus net export to neighbouring zones \cite{[search: day-ahead market zone balance requirement scheduled generation forecasted demand net export]}. Businesses that purchase their expected electricity needs on the day-ahead market are called \textit{Balance Responsible Parties} (BRPs). Following DAM clearing, each BRP is required to submit \textit{nominations} to Elia by 14:00 on the day ahead — a portfolio specifying planned generation or consumption at plant level with quarter-hourly resolution. Whereas the DAM clears at hourly granularity, nominations are required at the finer 15-minute level, already matching the quarter-hour settlement period of the imbalance market. Historically, Belgian BRPs were required to submit a \textit{balanced} portfolio — the so-called day-ahead balance obligation, introduced in the Federal Grid Code of 2002. This obligation has been progressively relaxed in recent years as intraday market liquidity has grown and the energy transition has made day-ahead positions inherently less representative of real-time conditions; the current Federal Grid Code of 2019 no longer formally imposes it \cite{[search: Elia day-ahead balance obligation BRP study 2020 Belgium imbalance tariff]}. BRPs therefore increasingly carry open positions from the DAM into the intraday market, and any residual deviation between the submitted nomination and the BRP's actual measured output or consumption on the day of delivery creates a financial exposure to the imbalance market.
+
+\subsection{Intraday Market}
+
+After day-ahead clearing, circumstances change: a wind farm may produce less than forecast, or a large consumer's schedule may shift. The intraday market allows BRPs to adjust their positions up until gate closure, which on the EPEX SPOT continuous platform reaches as close as zero minutes before delivery \cite{[search: Single Intraday Coupling SIDC cross-border continuous trading XBID gate closure]}. Trading is available around the clock for hourly, half-hourly, and quarter-hourly contracts. Cross-border intraday trading is facilitated by the Single Intraday Coupling (SIDC), spanning 25 European countries; since January 2025, the SIDC has operated exclusively with 15-minute products, directly matching the quarter-hour settlement period of the Belgian imbalance market \cite{[search: Single Intraday Coupling SIDC 15-minute products January 2025 EPEX SPOT]}. In addition to continuous trading, coupled intraday auctions have been available on all SIDC markets since June 2024, providing periodic liquidity-pooling points at which a reference price is established. Liquidity is thinner than in the DAM and prices are generally more volatile, but the intraday market provides a crucial safety valve that reduces the residual imbalance a BRP carries into real-time settlement. Following intraday trading, BRPs may submit updated intraday nominations to Elia on a quarter-hourly basis to reflect their revised positions. Unlike the day-ahead stage, a BRP's portfolio is not required to be in balance at the close of the intraday market. Any residual imbalance that remains after all intraday corrections have been submitted is settled through the balancing mechanism described in Section~\ref{sec:balancing-market}.
+
+\subsection{Reserve Market}
+\label{sec:reserve-market}
+
+Before real-time operation, Elia procures the balancing tools it will need to correct system imbalances through a separate \textit{reserve market}. Providers — generators, large consumers, and increasingly battery operators — submit bids to supply upward or downward regulation capacity. These bids are organised according to the standard European reserve hierarchy: \textit{Frequency Containment Reserves} (FCR) respond automatically within seconds to arrest frequency deviations; \textit{automatic Frequency Restoration Reserves} (aFRR) restore frequency to its nominal value within minutes; and \textit{manual Frequency Restoration Reserves} (mFRR) cover larger or sustained imbalances over longer time horizons \cite{[search: Elia Belgium FCR aFRR mFRR reserve products balancing market procurement]}. Elia procures these reserve capacities through periodic tenders, typically on a daily or weekly basis, before the delivery day begins.
+
+The reserve market is the upstream mechanism that populates the merit-order list from which Elia draws during real-time operation. The prices at which these pre-contracted reserve bids are activated in real-time are precisely the prices that become the MIP and MDP signals described in Section~\ref{sec:elia-signals}: when Elia activates the last (most expensive) upward reserve bid to cover a shortfall, its activation cost is the MIP; the equivalent for downward regulation is the MDP. The reserve market therefore determines the cost structure of real-time balancing and, through the MIP/MDP signals, the imbalance price that BRPs and BESS operators ultimately face.
+\label{sec:balancing-market}
+
+After the intraday market closes, any remaining deviation between a BRP's nominated programme and its actual measured output or consumption is settled on the \textit{imbalance market}. This is not a market in the traditional sense — BRPs do not trade here voluntarily. Rather, the imbalance market is an administrative settlement mechanism operated by Elia that charges or compensates BRPs for the energy imbalance they impose on the grid. The primary incentive for BRPs to manage their positions actively — rather than to rely on the imbalance market — is the \textit{imbalance tariff}: the financial exposure arising from an open position is typically larger and less predictable than any gain from deliberate inaction, making real-time balance a rational objective for most market participants \cite{[search: Elia day-ahead balance obligation BRP study 2020 Belgium imbalance tariff]}.
+
+Two features of the Belgian imbalance settlement are particularly important for this thesis:
+
+\begin{enumerate}
+    \item \textbf{Quarter-hour settlement period:} Energy imbalances are measured and settled in discrete 15-minute blocks, referred to as \textit{quarters}. A BRP that consumes more (or produces less) than its nominated programme during a quarter is said to be in \textit{short position} and must pay the imbalance price for the shortfall. A BRP in \textit{long position} (overproduction or under-consumption) is compensated at the imbalance price.
+    \item \textbf{End-of-quarter price determination:} The settlement price for a given quarter is not known in advance. It is determined only at the end of the quarter, based on the activation costs of the balancing resources Elia deployed during those 15 minutes. The price at minute 14 (the last minute) is the single price that applies to the entire quarter's volume.
+\end{enumerate}
+
+These two features create a highly asymmetric information structure: the volume of a trade (decided at minute 0) and its price (determined at minute 14) are separated by the full quarter duration, making the imbalance market substantially more challenging to navigate than markets where price and trade happen simultaneously.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Elia's Real-Time Signals}
+\label{sec:elia-signals}
+% ─────────────────────────────────────────────────────────────────────────────
+
+Elia, as the Belgian TSO, is responsible for maintaining the balance between generation and consumption on the high-voltage grid at every instant. To do so, it activates pre-contracted balancing reserves and publishes a set of real-time signals that reflect the current state of the system. These signals are released publicly with a latency of approximately one minute and form the informational backbone of the imbalance market \cite{[search: Elia TSO Belgium real-time balancing signals open data publication]}.
+
+\subsection{System Imbalance (SI)}
+
+The \textit{System Imbalance} (SI), expressed in MW, is the aggregate net position of all BRPs in Belgium at a given minute. A positive SI indicates that the system as a whole is long (generation exceeds consumption), while a negative SI indicates a short system (consumption exceeds generation):
+\[
+    \text{SI}_t = \sum_{i} \left( P^{\text{actual}}_{i,t} - P^{\text{nominated}}_{i,t} \right) \quad [\text{MW}]
+\]
+The SI is the primary driver of Elia's activation of balancing reserves. When the SI is strongly negative, Elia activates expensive upward reserves (additional generation or demand reduction) to bring the system back to balance; when strongly positive, it activates downward reserves (generation curtailment or demand increase).
+
+\subsection{Net Regulation Volume (NRV)}
+
+The \textit{Net Regulation Volume} (NRV), also in MW, represents the net volume of balancing energy that Elia has activated in the current quarter to correct the system imbalance:
+\[
+    \text{NRV}_t = V^{\uparrow}_t - V^{\downarrow}_t \quad [\text{MW}]
+\]
+where $V^{\uparrow}_t$ and $V^{\downarrow}_t$ denote the cumulative upward and downward regulation volumes activated up to minute $t$ within the quarter. A positive NRV means Elia has predominantly activated upward regulation (the system has been short); a negative NRV means downward regulation dominates (the system has been long).
+
+\subsection{Marginal Incremental Price (MIP) and Marginal Decremental Price (MDP)}
+
+When Elia needs to restore system balance, it activates balancing bids according to the \textit{merit order}: reserves are ranked by price, with the cheapest available resources called upon first and progressively more expensive units activated as the required regulation volume grows \cite{[search: merit order electricity balancing reserves activation TSO price formation]}. Under this principle, the cost of the last—and most expensive—upward bid that must be activated to cover the current shortfall is published as the \textit{Marginal Incremental Price} (MIP), and the cost of the last downward bid activated is the \textit{Marginal Decremental Price} (MDP):
+
+\begin{itemize}
+    \item \textbf{MIP} [EUR/MWh]: The marginal cost of upward regulation at minute $t$. A high MIP signals that Elia had to activate expensive peaking units to cover a generation shortfall. MIP is typically positive and spikes during periods of scarcity.
+    \item \textbf{MDP} [EUR/MWh]: The marginal cost of downward regulation at minute $t$. A high (in absolute terms) negative MDP signals an excess of generation that is expensive to curtail. MDP can be strongly negative during periods of high renewable infeed.
+\end{itemize}
+
+Both MIP and MDP are published minute-by-minute throughout the quarter and serve as \textit{forecast signals}: they indicate the direction and approximate level of the settlement price that will be determined at the end of the quarter.
+
+\subsection{The Alpha Pricing Mechanism and Imbalance Price Formation}
+\label{sec:alpha-pricing}
+
+The final \textit{Imbalance Price} (IP) for a quarter is determined by the so-called \textit{alpha pricing} rule. Elia uses a single-price settlement: one unique price applies to all BRP imbalances, regardless of whether they are long or short, with the sign determining whether the BRP pays or receives:
+
+\[
+    \text{IP}_q =
+    \begin{cases}
+        \text{MIP}_{q,14} & \text{if } \text{NRV}_{q,14} > 0 \quad \text{(system was short, upward regulation dominant)} \\
+        \text{MDP}_{q,14} & \text{if } \text{NRV}_{q,14} < 0 \quad \text{(system was long, downward regulation dominant)} \\
+        \text{DAP}_q       & \text{if } \text{NRV}_{q,14} = 0 \quad \text{(no regulation needed)}
+    \end{cases}
+\]
+
+where the subscript $q,14$ denotes the value at the final (14th) minute of quarter $q$, and $\text{DAP}_q$ is the day-ahead price for the corresponding hour. In practice the neutral case is rare; the imbalance price is almost always equal to either the MIP or the MDP at minute 14.
+
+A BRP's financial settlement for quarter $q$ is then:
+\[
+    \text{Settlement}_q = \text{IP}_q \times \text{Imbalance Volume}_q
+\]
+where a positive settlement means the BRP receives money (long position, positive price, or short position, negative price) and a negative settlement means the BRP pays.
+
+Figure~\ref{fig:mip-mdp-ip} illustrates a typical quarter: the MIP and MDP signals evolve throughout the 15 minutes as Elia's activation situation changes, with the final MIP or MDP value at minute 14 becoming the legally binding settlement price.
+
+\begin{figure}[h]
+    \centering
+    % Placeholder for a within-quarter MIP/MDP/IP evolution plot
+    \fbox{\parbox{0.95\textwidth}{\centering\vspace{1.5cm}
+    \textit{[TODO: Insert figure showing MIP, MDP, and final IP evolution within a single 15-minute quarter]}
+    \vspace{1.5cm}}}
+    \caption{Evolution of MIP (orange), MDP (blue), and the final settled Imbalance Price (dashed) within a single 15-minute settlement quarter.}
+    \label{fig:mip-mdp-ip}
+\end{figure}
+
+\subsection{Intra-Quarter Forecast Prices and the \texorpdfstring{$t=0$}{t=0} Signal}
+
+Because the settlement price is unknown until minute 14, market participants must act on imperfect information throughout the quarter. Elia publishes a minute-by-minute \textit{forecast} of the likely settlement price based on the latest SI, MIP, and MDP values. In the data used in this thesis, this forecast price is available at every minute of the quarter.
+
+A critical observation is that the very first minute of a quarter ($t=0$) provides a particularly noisy forecast: Elia has not yet activated any significant regulation volume, and the MIP/MDP signals reflect the state inherited from the previous quarter. By minute 14, the picture is fully resolved. This intra-quarter uncertainty is precisely the source of the \textit{trap quarters} described in Section~\ref{chap:2}: an agent that acts on the $t=0$ price signal is exposed to the risk that the system state reverses direction before settlement.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{The Role of Battery Energy Storage in the Imbalance Market}
+\label{sec:bess-role}
+% ─────────────────────────────────────────────────────────────────────────────
+
+A BESS is uniquely positioned to participate in the imbalance market because it can switch between generation (discharge) and consumption (charge) within seconds—far faster than conventional thermal generation. This flexibility allows a BESS owner to deliberately take an imbalance position as a profit-seeking strategy, rather than incurring an imbalance as an unavoidable consequence of forecast error.
+
+The arbitrage strategy is straightforward in principle:
+\begin{itemize}
+    \item \textbf{Charge} when the imbalance price is low or negative: the grid has excess energy, MDP is negative, and the BESS is paid to absorb it.
+    \item \textbf{Discharge} when the imbalance price is high: the grid is short, MIP is elevated, and the BESS receives a premium for injecting energy.
+\end{itemize}
+
+In practice, however, executing this strategy profitably is non-trivial for three reasons. First, the settlement price is not known until minute 14, so every charging or discharging decision at minute 0 is made under uncertainty. Second, the imbalance price is highly non-stationary: the magnitude and frequency of price spikes vary substantially across seasons, days of the week, and even hours within a day. This non-stationarity is driven in part by the intermittency and intra-day ramping patterns of variable renewable generation, whose growing share in the European energy mix amplifies both positive and negative price excursions \cite{[search: intermittent renewable energy electricity price volatility non-stationarity spot market]}. Third, the physical constraints of the battery—limited capacity, bounded charge/discharge rates, and cycle degradation costs—mean that every action forecloses future options.
+
+These three challenges—price uncertainty, non-stationarity, and physical constraints—together motivate the use of Deep Reinforcement Learning as the control methodology, as argued in Chapter~\ref{chap:methodology}.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Data Source and Preprocessing}
+\label{sec:data-source}
+% ─────────────────────────────────────────────────────────────────────────────
+
+All price data used in this thesis originate from Elia's open data platform \cite{[search: Elia open data platform Belgium imbalance price historical download]}. The raw dataset covers the period from January 2021 through December 2025 at one-minute resolution and includes the following fields for each minute:
+
+\begin{itemize}
+    \item \textbf{Datetime:} UTC timestamp of the observation.
+    \item \textbf{SI} [MW]: System Imbalance at the minute.
+    \item \textbf{NRV} [MW]: Net Regulation Volume cumulative within the current quarter.
+    \item \textbf{MIP} [EUR/MWh]: Marginal Incremental Price at the minute.
+    \item \textbf{MDP} [EUR/MWh]: Marginal Decremental Price at the minute.
+    \item \textbf{Imbalance Price} [EUR/MWh]: The published forecast or settled imbalance price at the minute. For minute 14 of each quarter this is the legally binding settlement value; for all other minutes it is a real-time forecast.
+\end{itemize}
+
+A key preprocessing step is the isolation of \textit{definitive prices}: only the readings at minutes where $(t_{\text{minute}} + 1) \bmod 15 = 0$ (i.e., minutes 14, 29, 44, and 59 of each hour) represent actual settlement prices. All other minute readings are intra-quarter forecasts. This distinction is important for the data analysis presented in Chapter~\ref{chap:market} and for the construction of the simulation environment described in Chapter~\ref{chap:methodology}.
+
+After removing rows with missing values and filtering to the definitive settlement prices where appropriate, the cleaned dataset contains approximately 140,000 settlement observations covering the full evaluation period. The dataset is subsequently split into cross-validation folds using the $hv$-block procedure described in Chapter~\ref{chap:methodology}, ensuring that the seasonal non-stationarity of the imbalance price is equitably represented across all training and test sets.
